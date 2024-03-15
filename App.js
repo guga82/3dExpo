@@ -18,6 +18,8 @@ import IconButton from "./components/iconButton";
 
 import pointsCoordinates from "./assets/newCoordinates";
 
+import dataServices from "./services/dataServices";
+
 let camPos = 120;
 let rotX;
 let rotY;
@@ -25,6 +27,23 @@ let rotZ;
 
 export default function App() {
   let timeout;
+
+  // const ws = new WebSocket("wss://echo.websocket.org");
+  const ws = new WebSocket("ws://192.168.3.10:81");
+  // const ws = new WebSocket("ws://192.168.43.12:81");
+  console.log("Iniciado WebSocket");
+
+  ws.onopen = (event) => {
+    console.log("Event data: ", event.data);
+  };
+  ws.onmessage = async function (event) {
+    const lidarData = event.data.split(",");
+    const lidarFiltered = await bufferReceive(lidarData);
+    // console.log("Dados filtrados: ", lidarFiltered);
+  };
+  ws.onclose = function (event) {
+    console.log("closed, code is:", event.code);
+  };
 
   useEffect(() => {
     // Clear the animation loop when the component unmounts
@@ -127,7 +146,7 @@ export default function App() {
   };
 
   const onRotLeft = async () => {
-    rotZ+= 0.2;
+    rotZ += 0.2;
   };
   const onRotRight = async () => {
     rotZ -= 0.2;
@@ -267,3 +286,134 @@ export default function App() {
     </View>
   );
 }
+
+let msrValues = {
+  lastValues: {},
+  avgValues: {},
+  stdDeviation: {},
+  xyz: {},
+  move: { x: 0, y: 0 },
+  lastMoves: [],
+};
+const tol = 0.03;
+
+const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
+
+const qtyMsgAvgCalc = 20; // Quantity of measures to calculate the average
+
+async function pointsFilter(angle, distance) {
+  let indexAngle = parseInt(angle);
+  let indexDistance = parseInt(distance);
+
+  msrValues["lastValues"][indexAngle] =
+    msrValues["lastValues"][indexAngle] || [];
+
+  if (msrValues["lastValues"][indexAngle].length >= qtyMsgAvgCalc) {
+    let average = await dataServices.averageCalcSemOutliers(
+      msrValues["lastValues"][indexAngle],
+      indexAngle,
+      dataServices.averageCalc,
+      dataServices.calcStdDeviation
+    );
+    average > 0 ? (msrValues["avgValues"][indexAngle] = average) : "";
+    msrValues["lastValues"][indexAngle].shift();
+  }
+
+  indexDistance > 0
+    ? msrValues["lastValues"][indexAngle].push(indexDistance)
+    : "";
+
+  //return console.log(JSON.stringify(msrValues["lastValues"]));
+}
+
+async function moveCalc(msrValues) {
+  let detectedMovement = { x: [], y: [] };
+  for (let angle = 1; angle <= 360; angle++) {
+    const oppositeAngle = dataServices.calculateOppositeAngle(angle);
+
+    if (
+      msrValues["avgValues"][angle] &&
+      msrValues["avgValues"][oppositeAngle] &&
+      msrValues["lastValues"][angle]
+    ) {
+      const actDistAngle = await dataServices.averageCalc([
+        ...msrValues["lastValues"][angle].slice(elQtyMovDetect),
+      ]);
+      const actDistOpsAngle = await dataServices.averageCalc([
+        ...msrValues["lastValues"][oppositeAngle].slice(elQtyMovDetect),
+      ]);
+
+      if (angle === 270 || angle === 50) {
+        msrValues["avgValues"][angle] = actDistAngle;
+        msrValues["avgValues"][oppositeAngle] = actDistOpsAngle;
+        const difAngle =
+          (msrValues["avgValues"][angle] -
+            msrValues["avgValues"][oppositeAngle]) /
+          2;
+
+        console.log("Grados ", angle, ": ", difAngle);
+        console.log("X: ", dataServices.lidarToXYZ(angle, difAngle).y);
+      }
+    }
+  }
+  return [
+    await dataServices.avgCalc(detectedMovement.x),
+    await dataServices.avgCalc(detectedMovement.y),
+  ];
+}
+
+async function bufferReceive(data) {
+  let byteSize = parseInt(data[2],16);
+
+  if (byteSize !== 58) {return}
+
+  let initAngle = dataServices.bytesGroup(data, 5, 6);
+  let endAngle = dataServices.bytesGroup(data, byteSize - 3, byteSize - 2);
+
+  if (initAngle / 100 < 360) {
+    await pointsFilter(initAngle / 100, parseInt(dataServices.bytesGroup(data, 7, 8),16));
+  }
+
+  let qtyAngles = (byteSize - 10) / 3;
+  let incAngle
+
+  if (endAngle>initAngle) {
+    incAngle = (endAngle - initAngle) / qtyAngles
+  } else {
+    incAngle = (36000 + endAngle - initAngle) / qtyAngles;
+  }
+
+  // console.log("start: ", initAngle, " - end: ", endAngle)
+  // console.log('inc ang: ', incAngle, '/', parseInt(data[2],16))
+
+  // Check all angles received
+  for (let index = 1; index < qtyAngles; index++) {
+    let indexAngle = initAngle + index * incAngle;
+    let distIndex = parseInt(dataServices.bytesGroup(data, 7 + index * 3, 8 + index * 3));
+
+    // Verificar a necessidade de ainda utilizar esta função
+    // let coordXYZ = lidarToXYZ(indexAngle / 100, distIndex);
+
+    if (indexAngle / 100 < 360) {
+      await pointsFilter(indexAngle / 100, distIndex);
+    }
+  }
+
+  // Verify if start new turn from LiDAR sensor
+  // if (endAngle < initAngle) {
+  //   const avgMove = await moveCalc(); //|| [0,0]
+
+  //   msrValues["move"].x += avgMove[0];
+  //   msrValues["move"].y += avgMove[1];
+  // }
+  return;
+}
+
+setInterval(async () => {
+  msrValues["xyz"] = Object.keys(msrValues["avgValues"]).map((angle) =>
+    dataServices.lidarToXYZ(angle, msrValues["avgValues"][angle])
+  );
+  console.log(msrValues);
+  // console.log(msrValues["lastValues"][270]);
+  // console.log(parseInt(msrValues["avgValues"][90]), " / ", parseInt(msrValues["avgValues"][270]));
+}, 2000);
