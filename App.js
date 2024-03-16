@@ -1,7 +1,8 @@
 import { GLView } from "expo-gl";
 import { Renderer } from "expo-three";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { Magnetometer } from 'expo-sensors';
 import {
   PerspectiveCamera,
   Scene,
@@ -15,11 +16,10 @@ import {
 } from "three";
 // import * as NavigationBar from "expo-navigation-bar";
 import IconButton from "./components/iconButton";
-
-import pointsCoordinates from "./assets/newCoordinates";
-
+import firstCoordinates from "./assets/newCoordinates";
 import dataServices from "./services/dataServices";
 
+let pointsCoordinates = firstCoordinates;
 let camPos = 120;
 let rotX;
 let rotY;
@@ -78,7 +78,8 @@ export default function App() {
     scene.add(spotLight);
 
     const pointsGeometry = new BufferGeometry();
-    const positions = [];
+    let positions = [];
+
     pointsCoordinates.forEach((coord) => {
       positions.push(coord.x / 100, coord.y / 100, coord.z / 100);
     });
@@ -87,9 +88,26 @@ export default function App() {
       new Float32BufferAttribute(positions, 3)
     );
 
-    const pointsMaterial = new PointsMaterial({ color: 0xffffff });
-    const points = new Points(pointsGeometry, pointsMaterial);
+    let pointsMaterial = new PointsMaterial({ color: 0xffffff });
+    let points = new Points(pointsGeometry, pointsMaterial);
     scene.add(points);
+
+
+
+    const updatePoints = ()=>{
+      positions = []
+      pointsCoordinates.forEach((coord) => {
+        positions.push(coord.x / 100, coord.y / 100, coord.z / 100);
+      });
+      pointsGeometry.setAttribute(
+        "position",
+        new Float32BufferAttribute(positions, 3)
+      );
+      points = new Points(pointsGeometry, pointsMaterial);
+
+    }
+
+    setInterval(updatePoints,300)
 
     let aumenta = false;
 
@@ -363,22 +381,27 @@ async function moveCalc(msrValues) {
 }
 
 async function bufferReceive(data) {
-  let byteSize = parseInt(data[2],16);
+  let byteSize = parseInt(data[2], 16);
 
-  if (byteSize !== 58) {return}
+  if (byteSize !== 58) {
+    return;
+  }
 
   let initAngle = dataServices.bytesGroup(data, 5, 6);
   let endAngle = dataServices.bytesGroup(data, byteSize - 3, byteSize - 2);
 
   if (initAngle / 100 < 360) {
-    await pointsFilter(initAngle / 100, parseInt(dataServices.bytesGroup(data, 7, 8),16));
+    await pointsFilter(
+      initAngle / 100,
+      parseInt(dataServices.bytesGroup(data, 7, 8), 16)
+    );
   }
 
   let qtyAngles = (byteSize - 10) / 3;
-  let incAngle
+  let incAngle;
 
-  if (endAngle>initAngle) {
-    incAngle = (endAngle - initAngle) / qtyAngles
+  if (endAngle > initAngle) {
+    incAngle = (endAngle - initAngle) / qtyAngles;
   } else {
     incAngle = (36000 + endAngle - initAngle) / qtyAngles;
   }
@@ -389,7 +412,9 @@ async function bufferReceive(data) {
   // Check all angles received
   for (let index = 1; index < qtyAngles; index++) {
     let indexAngle = initAngle + index * incAngle;
-    let distIndex = parseInt(dataServices.bytesGroup(data, 7 + index * 3, 8 + index * 3));
+    let distIndex = parseInt(
+      dataServices.bytesGroup(data, 7 + index * 3, 8 + index * 3)
+    );
 
     // Verificar a necessidade de ainda utilizar esta função
     // let coordXYZ = lidarToXYZ(indexAngle / 100, distIndex);
@@ -409,11 +434,33 @@ async function bufferReceive(data) {
   return;
 }
 
+
 setInterval(async () => {
   msrValues["xyz"] = Object.keys(msrValues["avgValues"]).map((angle) =>
     dataServices.lidarToXYZ(angle, msrValues["avgValues"][angle])
   );
-  console.log(msrValues);
+  // console.log(msrValues);
+  pointsCoordinates = msrValues["xyz"];
+
+  // // Dentro da função bufferReceive, após atualizar pointsCoordinates:
+  // pointsGeometry.dispose(); // Limpe a geometria antiga
+  // pointsGeometry = new BufferGeometry(); // Crie uma nova geometria
+  // const newPositions = []; // Array para as novas posições
+
+  // // Popule o novo array de posições com as novas coordenadas
+  // pointsCoordinates.forEach((coord) => {
+  //   newPositions.push(coord.x / 100, coord.y / 100, coord.z / 100);
+  // });
+
+  // // Atribua as novas posições à geometria dos pontos
+  // pointsGeometry.setAttribute(
+  //   "position",
+  //   new Float32BufferAttribute(newPositions, 3)
+  // );
+
+  // // Sinalize que a geometria foi atualizada
+  // pointsGeometry.attributes.position.needsUpdate = true;
+
   // console.log(msrValues["lastValues"][270]);
   // console.log(parseInt(msrValues["avgValues"][90]), " / ", parseInt(msrValues["avgValues"][270]));
-}, 2000);
+}, 100);
