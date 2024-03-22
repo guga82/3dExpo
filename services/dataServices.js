@@ -1,21 +1,34 @@
 class DataServices {
+  // Pooling function
+  async poolingData(data, newValue, size) {
+    let dataTmp = [...data];
+
+    if (dataTmp.length >= size) {
+      dataTmp.shift();
+    }
+
+    newValue !== '' ? dataTmp.push(newValue) : '';
+
+    return dataTmp;
+  }
+
   // bytes group
   bytesGroup(data, high, low) {
     // Extraindo os bytes High e Low
-    const highByte = parseInt(data[high],16);
-    const lowByte = parseInt(data[low],16);
+    const highByte = parseInt(data[high], 16);
+    const lowByte = parseInt(data[low], 16);
 
     // Combinação dos bytes High e Low
-    return ((highByte << 8) | lowByte);
+    return (highByte << 8) | lowByte;
   }
 
   // Função para converter ângulo e medida em coordinates XYZ
-  lidarToXYZ(angleDegrees, distance) {
+  async lidarToXYZ(angleDegrees, distance, z) {
     let coordinates = {};
     const angleRadians = (angleDegrees * Math.PI) / 180.0;
     coordinates.x = parseInt(distance * Math.cos(angleRadians));
     coordinates.y = parseInt(distance * Math.sin(angleRadians));
-    coordinates.z = 0;
+    coordinates.z = z === undefined ? 0 : z;
 
     return coordinates;
   }
@@ -39,10 +52,9 @@ class DataServices {
   }
 
   // Pipe the data into another stream (like a parser or standard out)
-  async averageCalcSemOutliers(data, angle, fAverageCalc, fCalcStdDeviation) {
-    const desviosPadraoLimite = 1.8
+  async averageCalcSemOutliers(data, desviosPadraoLimite, fAverageCalc, fCalcStdDeviation) {
     // Ordena os dados
-    const orderedData = await [...data].sort((a, b) => {
+    const orderedData = [...data].sort((a, b) => {
       if (a > b) return 1;
       else if (a < b) return -1;
       else return 0;
@@ -55,7 +67,7 @@ class DataServices {
     // Filtra os valores que não são considerados outliers
     const filteredData = orderedData.filter((valor) => {
       const distanciaEmDesviosPadrao = Math.abs(valor - media) / stdDeviation;
-      return distanciaEmDesviosPadrao <= desviosPadraoLimite;
+      return desviosPadraoLimite > 0 ? distanciaEmDesviosPadrao <= desviosPadraoLimite : true;
     });
 
     // Calcula a média dos valores filtrados
@@ -97,7 +109,6 @@ class DataServices {
 
     return average;
   }
-
 }
 
 export default new DataServices();

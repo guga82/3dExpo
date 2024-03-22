@@ -1,14 +1,11 @@
 import { GLView } from "expo-gl";
 import { Renderer } from "expo-three";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Magnetometer } from 'expo-sensors';
+import { Magnetometer, Barometer, Accelerometer } from "expo-sensors";
 import {
   PerspectiveCamera,
   Scene,
-  AmbientLight,
-  PointLight,
-  SpotLight,
   Points,
   PointsMaterial,
   BufferGeometry,
@@ -24,14 +21,278 @@ let camPos = 120;
 let rotX;
 let rotY;
 let rotZ;
+// let magX = [];
+// let magY = [];
+// let magZ = [];
+// let xMagV = 0;
+// let yMagV = 0;
+// let zMagV = 0;
 
 export default function App() {
+  let barometerValues = [];
+  let accelerometerValues = { x: [], y: [], z: [] };
+  let magnetometerValues = { x: [], y: [], z: [] };
+  let magnetometerAvg = { x: 0, y: 0, z: 0 };
+  let magnetoMax = { x: 0, y: 0, z: 0 };
+  let magnetoMin = { x: 0, y: 0, z: 0 };
+  let magnetoGiro = { x: 0, y: 0, z: 0 };
+  let accelerometerAvg = { x: 0, y: 0, z: 0 };
   let timeout;
+
+  const barometerSizeAverage = 20;
+  const magnetbarometerSizeAverage = 6;
+  const accelerometerSizeAverage = 8;
+
+  Magnetometer.setUpdateInterval(200);
+  Magnetometer.addListener(async (res) => {
+    magnetometerValues.x = await dataServices.poolingData(
+      magnetometerValues.x,
+      parseInt(res.x * 1000),
+      magnetbarometerSizeAverage
+    );
+
+    magnetometerValues.y = await dataServices.poolingData(
+      magnetometerValues.y,
+      parseInt(res.y * 1000),
+      magnetbarometerSizeAverage
+    );
+
+    magnetometerValues.z = await dataServices.poolingData(
+      magnetometerValues.z,
+      parseInt(res.z * 1000),
+      magnetbarometerSizeAverage
+    );
+    return magnetometerUpdate();
+  });
+
+  function magnetometerUpdate() {
+    dataServices
+      .averageCalcSemOutliers(
+        magnetometerValues.x,
+        0,
+        dataServices.averageCalc,
+        dataServices.calcStdDeviation
+      )
+      .then((res) => {
+        magnetometerAvg.x = parseInt(res);
+        if (
+          Math.abs(accelerometerAvg.z > 90) ||
+          Math.abs(accelerometerAvg.z < 10)
+        ) {
+          if (parseInt(res) > magnetoMax.x) {
+            magnetoMax.x = parseInt(res);
+          }
+          if (parseInt(res) < magnetoMin.x || magnetoMin.x === 0) {
+            magnetoMin.x = parseInt(res);
+          }
+        }
+      });
+    dataServices
+      .averageCalcSemOutliers(
+        magnetometerValues.y,
+        0,
+        dataServices.averageCalc,
+        dataServices.calcStdDeviation
+      )
+      .then((res) => {
+        magnetometerAvg.y = parseInt(res);
+        if (
+          Math.abs(accelerometerAvg.y > 90) ||
+          Math.abs(accelerometerAvg.y < 10)
+        ) {
+          if (parseInt(res) > magnetoMax.y) {
+            magnetoMax.y = parseInt(res);
+          }
+          if (parseInt(res) < magnetoMin.y || magnetoMin.y === 0) {
+            magnetoMin.y = parseInt(res);
+          }
+        }
+      });
+    dataServices
+      .averageCalcSemOutliers(
+        magnetometerValues.z,
+        0,
+        dataServices.averageCalc,
+        dataServices.calcStdDeviation
+      )
+      .then((res) => {
+        magnetometerAvg.z = parseInt(res);
+        if (
+          Math.abs(accelerometerAvg.x > 90) ||
+          Math.abs(accelerometerAvg.x < 10)
+        ) {
+          if (parseInt(res) > magnetoMax.z) {
+            magnetoMax.z = parseInt(res);
+          }
+          if (parseInt(res) < magnetoMin.z || magnetoMin.z === 0) {
+            magnetoMin.z = parseInt(res);
+          }
+        }
+      });
+
+    return calcGiro();
+  }
+  
+  function calcGiro() {
+    Object.keys(magnetoGiro).forEach((eixo) => {
+      magnetoGiro[eixo] = parseInt(
+        (180 / Math.abs(magnetoMax[eixo] - magnetoMin[eixo])) *
+          (magnetometerAvg[eixo] - magnetoMin[eixo])
+      );
+    });
+    return updateGiroAng();
+
+    // Se Y > 90 e X > 90 então ANGULO = X + 180
+    // Se X > 90 e Y > 90 entáo ANGULO = Y + 180
+    // Se Y > 90 e Z > 90 então ANGULO = Z + 180
+    // Se X
+  }
+
+  function updateGiroAng() {
+    if (Math.abs(accelerometerAvg.x) > 90 && false) { // Lateral para cima
+      //magnetoGiro z ou y + 180
+    } else if (Math.abs(accelerometerAvg.y) > 90 && false) { // Ponta para cima
+      // magnetoGiro z ou x +180
+    } else if (Math.abs(accelerometerAvg.z) > 90) { // Tela para cima
+      if (magnetoGiro.x >= 135 && magnetoGiro.y >= 90) {
+        console.log("Oitava 1")
+        magnetoGiro["avg"] = 180 - magnetoGiro.x
+      } else if (magnetoGiro.y >= 135 && magnetoGiro.x >= 90) {
+        console.log("Oitava 2")
+        magnetoGiro["avg"] = magnetoGiro.y-90
+      } else if (magnetoGiro.y >= 135 && magnetoGiro.x < 90) {
+        console.log("Oitava 3")
+        magnetoGiro["avg"] = 270 - magnetoGiro.y
+      } else if (magnetoGiro.x <=45 && magnetoGiro.y > 90) {
+        console.log("Oitava 4")
+        magnetoGiro["avg"] = 180 - magnetoGiro.x
+      } else if (magnetoGiro.x <=45 && magnetoGiro.y <= 90) {
+        console.log("Oitava 5")
+        magnetoGiro["avg"] = 180 + magnetoGiro.x
+      } else if (magnetoGiro.y <=45 && magnetoGiro.x <= 90) {
+        console.log("Oitava 6")
+        magnetoGiro["avg"] = 270 - magnetoGiro.y
+      } else if (magnetoGiro.y <=45 && magnetoGiro.x >= 90) {
+        console.log("Oitava 7")
+        magnetoGiro["avg"] = 270 + magnetoGiro.y
+      } else if (magnetoGiro.x >= 135 && magnetoGiro.y <= 90) {
+        console.log("Oitava 8")
+        magnetoGiro["avg"] = 180 + magnetoGiro.x
+      }
+
+      // if (magnetoGiro.x > 90)
+      // // magnetoGiro x ou y + 180
+      // magnetoGiro["avg"] = (magnetoGiro.x + (360 - magnetoGiro.y) + 180) / 2;
+    }
+
+    // if (Math.abs(accelerometerAvg.x) > 90 && false) {
+    //   //magnetoGiro z ou y + 180
+    //   magnetoGiro["avg"] = (magnetoGiro.z + magnetoGiro.y + 90) / 2;
+    // } else if (Math.abs(accelerometerAvg.y) > 90 && false) {
+    //   // magnetoGiro z ou x +180
+    //   magnetoGiro["avg"] = (magnetoGiro.z + magnetoGiro.x + 90) / 2;
+    // } else if (Math.abs(accelerometerAvg.z) > 90) {
+    //   if (magnetoGiro.x > )
+    //   // magnetoGiro x ou y + 180
+    //   magnetoGiro["avg"] = (magnetoGiro.x + (360 - magnetoGiro.y) + 180) / 2;
+    // }
+
+    // magnetoGiro["avg"] > 360
+    //   ? (magnetoGiro["avg"] = magnetoGiro["avg"] - 360)
+    //   : "";
+    /*
+y 0 => x > 180
+y 360 => x < 180
+ */
+    return;
+  }
+
+  setInterval(() => {
+    console.log("angulo: ", accelerometerAvg);
+    console.log("giro: ", magnetoGiro);
+  }, 1000);
+
+  Accelerometer.setUpdateInterval(150);
+  Accelerometer.addListener(async (res) => {
+    accelerometerValues.x = await dataServices.poolingData(
+      accelerometerValues.x,
+      parseInt(res.x * 100),
+      accelerometerSizeAverage
+    );
+    accelerometerValues.y = await dataServices.poolingData(
+      accelerometerValues.y,
+      parseInt(res.y * 100),
+      accelerometerSizeAverage
+    );
+    accelerometerValues.z = await dataServices.poolingData(
+      accelerometerValues.z,
+      parseInt(res.z * 100),
+      accelerometerSizeAverage
+    );
+
+    return accelerometerUpdate();
+  });
+
+  async function accelerometerUpdate() {
+    accelerometerAvg.x = parseInt(
+      await dataServices.averageCalcSemOutliers(
+        accelerometerValues.x,
+        2,
+        dataServices.averageCalc,
+        dataServices.calcStdDeviation
+      )
+    );
+    accelerometerAvg.y = parseInt(
+      await dataServices.averageCalcSemOutliers(
+        accelerometerValues.y,
+        2,
+        dataServices.averageCalc,
+        dataServices.calcStdDeviation
+      )
+    );
+    accelerometerAvg.z = parseInt(
+      await dataServices.averageCalcSemOutliers(
+        accelerometerValues.z,
+        2,
+        dataServices.averageCalc,
+        dataServices.calcStdDeviation
+      )
+    );
+    return;
+  }
+
+  Barometer.setUpdateInterval(50);
+  Barometer.addListener(async (res) => {
+    // setPressure(res.pressure);
+    // barometerValues.push(parseInt(res.pressure*10000))
+
+    barometerValues = await dataServices.poolingData(
+      barometerValues,
+      parseInt(res.pressure * 1000),
+      barometerSizeAverage
+    );
+    return barometerUpdate();
+  });
+
+  function barometerUpdate() {
+    dataServices
+      .averageCalcSemOutliers(
+        barometerValues,
+        0.9,
+        dataServices.averageCalc,
+        dataServices.calcStdDeviation
+      )
+      .then((res) => {
+        // console.log(parseInt(res));
+      });
+  }
+
+  // setInterval(barometerUpdate, 200);
 
   // const ws = new WebSocket("wss://echo.websocket.org");
   const ws = new WebSocket("ws://192.168.3.10:81");
   // const ws = new WebSocket("ws://192.168.43.12:81");
-  console.log("Iniciado WebSocket");
+  // console.log("Iniciado WebSocket");
 
   ws.onopen = (event) => {
     console.log("Event data: ", event.data);
@@ -42,7 +303,7 @@ export default function App() {
     // console.log("Dados filtrados: ", lidarFiltered);
   };
   ws.onclose = function (event) {
-    console.log("closed, code is:", event.code);
+    // console.log("closed, code is:", event.code);
   };
 
   useEffect(() => {
@@ -50,7 +311,7 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, []);
 
-  const onContextCreate = async (gl) => {
+  const onContextCreate = async (gl, reloadFunction) => {
     const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
     const sceneColor = 0x6ad6f0;
 
@@ -64,18 +325,6 @@ export default function App() {
     camera.lookAt(0, 0, 0); // aponta a câmera para o centro da cena
 
     const scene = new Scene();
-
-    const ambientLight = new AmbientLight(0x101010);
-    scene.add(ambientLight);
-
-    const pointLight = new PointLight(0xffffff, 2, 1000, 1);
-    pointLight.position.set(0, 200, 200);
-    scene.add(pointLight);
-
-    const spotLight = new SpotLight(0xffffff, 0.5);
-    spotLight.position.set(0, 500, 100);
-    spotLight.lookAt(scene.position);
-    scene.add(spotLight);
 
     const pointsGeometry = new BufferGeometry();
     let positions = [];
@@ -92,22 +341,46 @@ export default function App() {
     let points = new Points(pointsGeometry, pointsMaterial);
     scene.add(points);
 
+    const updatePoints = () => {
+      points = {};
+      positions = [];
+      scene.children = [];
+      if (pointsCoordinates.length > 1) {
+        console.log("updating points");
+        pointsCoordinates.forEach((coord) => {
+          positions.push(coord.x / 100, coord.y / 100, coord.z / 100);
+        });
+        pointsGeometry.setAttribute(
+          "position",
+          new Float32BufferAttribute(positions, 3)
+        );
+        points = new Points(pointsGeometry, pointsMaterial);
+        scene.add(points);
+      }
+    };
 
+    // const updatePoints = () => {
+    //   let newPositions = []
+    //   pointsCoordinates.forEach((coord) => {
+    //     newPositions.push(coord.x / 100, coord.y / 100, coord.z / 100);
+    //   });
+    //   // console.log(points)
+    //   // positions = [];
+    //   // if (pointsCoordinates.length > 100) {
+    //   //   console.log("updating points")
+    //   //   pointsCoordinates.forEach((coord) => {
+    //   //     positions.push(coord.x / 100, coord.y / 100, coord.z / 100);
+    //   //   });
+    //   //   pointsGeometry.setAttribute(
+    //   //     "position",
+    //   //     new Float32BufferAttribute(positions, 3)
+    //   //   );
+    //   //   pointsGeometry.attributes.position.needsUpdate = true; // Indica que os atributos foram atualizados
+    //   // }
+    //   return points.geometry.attributes.position = newPositions
+    // };
 
-    const updatePoints = ()=>{
-      positions = []
-      pointsCoordinates.forEach((coord) => {
-        positions.push(coord.x / 100, coord.y / 100, coord.z / 100);
-      });
-      pointsGeometry.setAttribute(
-        "position",
-        new Float32BufferAttribute(positions, 3)
-      );
-      points = new Points(pointsGeometry, pointsMaterial);
-
-    }
-
-    setInterval(updatePoints,300)
+    setInterval(updatePoints, 15000);
 
     let aumenta = false;
 
@@ -177,8 +450,28 @@ export default function App() {
     camPos += 2;
   };
 
+  const stopMeasure = async () => {
+    console.log("stop measure");
+    compile();
+    clearInterval(measureStarted);
+  };
+
+  const startMeasure = async () => {
+    console.log("start measure");
+    measureStarted = setInterval(updateZaxis, 36);
+  };
+
   const styles = StyleSheet.create({
+    temporario: {
+      flex: 1,
+      justifyContent: "center",
+      paddingHorizontal: 10,
+    },
     container: {
+      flex: 1,
+    },
+    draw: {
+      height: 700,
       flex: 1,
     },
     header: {
@@ -194,6 +487,7 @@ export default function App() {
     buttonContainer: {
       flex: 1,
       marginTop: 0,
+      height: 20,
       justifyContent: "center",
       alignItems: "center",
       position: "relative",
@@ -230,7 +524,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       {/* <View> */}
-      <GLView style={{ flex: 1 }} onContextCreate={onContextCreate} />
+      <GLView style={styles.draw} onContextCreate={onContextCreate} />
       {/* </View> */}
       {/* Cabeçalho */}
       {/* <View style={{ backgroundColor: "lightblue", padding: 10 }}>
@@ -241,7 +535,16 @@ export default function App() {
         <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
       </View> */}
       {/* Botões */}
+      {/* <View style={styles.temporario}> */}
+
+      {/* <Text>Pressure: {averagePressure} hPa</Text> */}
+      {/* </View> */}
       <View style={styles.buttonContainer}>
+        {/* <Text style={styles.text}>x: {x}</Text>
+        <Text style={styles.text}>y: {y}</Text>
+        <Text style={styles.text}>z: {z}</Text> */}
+        {/* <Text style={styles.text}>media: {averagePressure.toFixed(3)}</Text> */}
+        {/* <Text style={styles.text}>localização: {text}</Text> */}
         {/* Botões para cima e para baixo */}
         <View style={styles.upButtonContainer}>
           <IconButton
@@ -267,6 +570,12 @@ export default function App() {
         {/* Botões para esquerda e direita */}
         <View style={styles.leftRightButtonContainer}>
           <IconButton
+            icon="stop"
+            label="stop"
+            onPress={stopMeasure}
+            style={styles.leftButton}
+          />
+          <IconButton
             icon="zoom-out"
             label="zoomOut"
             onPress={onZoomOut}
@@ -290,6 +599,12 @@ export default function App() {
             onPress={onZoomIn}
             style={styles.leftButton}
           />
+          <IconButton
+            icon="start"
+            label="start"
+            onPress={startMeasure}
+            style={styles.leftButton}
+          />
         </View>
 
         <View style={styles.downButtonContainer}>
@@ -309,15 +624,19 @@ let msrValues = {
   lastValues: {},
   avgValues: {},
   stdDeviation: {},
-  xyz: {},
+  xyz: [],
   move: { x: 0, y: 0 },
   lastMoves: [],
+  zReg: {},
 };
-const tol = 0.03;
-
+const tol = 0.3;
 const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
-
 const qtyMsgAvgCalc = 20; // Quantity of measures to calculate the average
+//36 ms = 5cm
+let measureStarted;
+let zAxis = 0;
+let counter = 0;
+const incrZ = 50;
 
 async function pointsFilter(angle, distance) {
   let indexAngle = parseInt(angle);
@@ -329,7 +648,7 @@ async function pointsFilter(angle, distance) {
   if (msrValues["lastValues"][indexAngle].length >= qtyMsgAvgCalc) {
     let average = await dataServices.averageCalcSemOutliers(
       msrValues["lastValues"][indexAngle],
-      indexAngle,
+      tol,
       dataServices.averageCalc,
       dataServices.calcStdDeviation
     );
@@ -337,50 +656,22 @@ async function pointsFilter(angle, distance) {
     msrValues["lastValues"][indexAngle].shift();
   }
 
-  indexDistance > 0
+  indexDistance > 0 //&& indexAngle < 160
     ? msrValues["lastValues"][indexAngle].push(indexDistance)
     : "";
-
-  //return console.log(JSON.stringify(msrValues["lastValues"]));
 }
 
-async function moveCalc(msrValues) {
-  let detectedMovement = { x: [], y: [] };
-  for (let angle = 1; angle <= 360; angle++) {
-    const oppositeAngle = dataServices.calculateOppositeAngle(angle);
-
-    if (
-      msrValues["avgValues"][angle] &&
-      msrValues["avgValues"][oppositeAngle] &&
-      msrValues["lastValues"][angle]
-    ) {
-      const actDistAngle = await dataServices.averageCalc([
-        ...msrValues["lastValues"][angle].slice(elQtyMovDetect),
-      ]);
-      const actDistOpsAngle = await dataServices.averageCalc([
-        ...msrValues["lastValues"][oppositeAngle].slice(elQtyMovDetect),
-      ]);
-
-      if (angle === 270 || angle === 50) {
-        msrValues["avgValues"][angle] = actDistAngle;
-        msrValues["avgValues"][oppositeAngle] = actDistOpsAngle;
-        const difAngle =
-          (msrValues["avgValues"][angle] -
-            msrValues["avgValues"][oppositeAngle]) /
-          2;
-
-        console.log("Grados ", angle, ": ", difAngle);
-        console.log("X: ", dataServices.lidarToXYZ(angle, difAngle).y);
-      }
-    }
-  }
-  return [
-    await dataServices.avgCalc(detectedMovement.x),
-    await dataServices.avgCalc(detectedMovement.y),
-  ];
+async function updateZaxis() {
+  const newValues = { ...msrValues["avgValues"] };
+  zAxis += 1; // normal é 50
+  return (msrValues["zReg"][zAxis] = newValues);
 }
 
 async function bufferReceive(data) {
+  counter++;
+  if (counter > 1000) {
+    counter = 0;
+  }
   let byteSize = parseInt(data[2], 16);
 
   if (byteSize !== 58) {
@@ -406,9 +697,6 @@ async function bufferReceive(data) {
     incAngle = (36000 + endAngle - initAngle) / qtyAngles;
   }
 
-  // console.log("start: ", initAngle, " - end: ", endAngle)
-  // console.log('inc ang: ', incAngle, '/', parseInt(data[2],16))
-
   // Check all angles received
   for (let index = 1; index < qtyAngles; index++) {
     let indexAngle = initAngle + index * incAngle;
@@ -416,51 +704,30 @@ async function bufferReceive(data) {
       dataServices.bytesGroup(data, 7 + index * 3, 8 + index * 3)
     );
 
-    // Verificar a necessidade de ainda utilizar esta função
-    // let coordXYZ = lidarToXYZ(indexAngle / 100, distIndex);
-
     if (indexAngle / 100 < 360) {
       await pointsFilter(indexAngle / 100, distIndex);
     }
   }
 
-  // Verify if start new turn from LiDAR sensor
-  // if (endAngle < initAngle) {
-  //   const avgMove = await moveCalc(); //|| [0,0]
-
-  //   msrValues["move"].x += avgMove[0];
-  //   msrValues["move"].y += avgMove[1];
-  // }
   return;
 }
 
+const compile = async () => {
+  if (msrValues["zReg"]) {
+    msrValues["xyz"] = [];
+    pointsCoordinates = [];
+    Object.keys(msrValues["zReg"]).forEach((zReg) => {
+      Object.keys(msrValues["zReg"][zReg]).forEach(async (angle) => {
+        await dataServices
+          .lidarToXYZ(
+            angle,
+            msrValues["zReg"][zReg][angle],
+            parseInt(zReg * incrZ)
+          )
+          .then((res) => msrValues["xyz"].push(res));
+      });
+    });
 
-setInterval(async () => {
-  msrValues["xyz"] = Object.keys(msrValues["avgValues"]).map((angle) =>
-    dataServices.lidarToXYZ(angle, msrValues["avgValues"][angle])
-  );
-  // console.log(msrValues);
-  pointsCoordinates = msrValues["xyz"];
-
-  // // Dentro da função bufferReceive, após atualizar pointsCoordinates:
-  // pointsGeometry.dispose(); // Limpe a geometria antiga
-  // pointsGeometry = new BufferGeometry(); // Crie uma nova geometria
-  // const newPositions = []; // Array para as novas posições
-
-  // // Popule o novo array de posições com as novas coordenadas
-  // pointsCoordinates.forEach((coord) => {
-  //   newPositions.push(coord.x / 100, coord.y / 100, coord.z / 100);
-  // });
-
-  // // Atribua as novas posições à geometria dos pontos
-  // pointsGeometry.setAttribute(
-  //   "position",
-  //   new Float32BufferAttribute(newPositions, 3)
-  // );
-
-  // // Sinalize que a geometria foi atualizada
-  // pointsGeometry.attributes.position.needsUpdate = true;
-
-  // console.log(msrValues["lastValues"][270]);
-  // console.log(parseInt(msrValues["avgValues"][90]), " / ", parseInt(msrValues["avgValues"][270]));
-}, 100);
+    pointsCoordinates = msrValues["xyz"];
+  }
+};
