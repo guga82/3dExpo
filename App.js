@@ -132,7 +132,7 @@ export default function App() {
 
     return calcGiro();
   }
-  
+
   function calcGiro() {
     Object.keys(magnetoGiro).forEach((eixo) => {
       magnetoGiro[eixo] = parseInt(
@@ -149,36 +149,88 @@ export default function App() {
   }
 
   function updateGiroAng() {
-    if (Math.abs(accelerometerAvg.x) > 90 && false) { // Lateral para cima
+    if (Math.abs(accelerometerAvg.x) > 90 && false) {
+      // Lateral para cima
       //magnetoGiro z ou y + 180
-    } else if (Math.abs(accelerometerAvg.y) > 90 && false) { // Ponta para cima
+    } else if (Math.abs(accelerometerAvg.y) > 90 && false) {
+      // Ponta para cima
       // magnetoGiro z ou x +180
-    } else if (Math.abs(accelerometerAvg.z) > 90) { // Tela para cima
-      if (magnetoGiro.x >= 135 && magnetoGiro.y >= 90) {
-        console.log("Oitava 1")
-        magnetoGiro["avg"] = 180 - magnetoGiro.x
-      } else if (magnetoGiro.y >= 135 && magnetoGiro.x >= 90) {
-        console.log("Oitava 2")
-        magnetoGiro["avg"] = magnetoGiro.y-90
-      } else if (magnetoGiro.y >= 135 && magnetoGiro.x < 90) {
-        console.log("Oitava 3")
-        magnetoGiro["avg"] = 270 - magnetoGiro.y
-      } else if (magnetoGiro.x <=45 && magnetoGiro.y > 90) {
-        console.log("Oitava 4")
-        magnetoGiro["avg"] = 180 - magnetoGiro.x
-      } else if (magnetoGiro.x <=45 && magnetoGiro.y <= 90) {
-        console.log("Oitava 5")
-        magnetoGiro["avg"] = 180 + magnetoGiro.x
-      } else if (magnetoGiro.y <=45 && magnetoGiro.x <= 90) {
-        console.log("Oitava 6")
-        magnetoGiro["avg"] = 270 - magnetoGiro.y
-      } else if (magnetoGiro.y <=45 && magnetoGiro.x >= 90) {
-        console.log("Oitava 7")
-        magnetoGiro["avg"] = 270 + magnetoGiro.y
-      } else if (magnetoGiro.x >= 135 && magnetoGiro.y <= 90) {
-        console.log("Oitava 8")
-        magnetoGiro["avg"] = 180 + magnetoGiro.x
+    } else if (Math.abs(accelerometerAvg.z) > 70) {
+      // Tela para cima
+
+      let magnetude = Math.sqrt(
+        magnetometerAvg.x ** 2 + magnetometerAvg.y ** 2
+      );
+      let radianos = Math.atan(magnetometerAvg.x / magnetometerAvg.y);
+      // if (radianos < 0) {
+      //   radianos = radianos + 2 * Math.PI;
+      // }
+      const graus = (radianos * (180 / Math.PI))+90;
+      let graus360
+
+      // de x: 0 / y: 60 a x: 178 / y: 80 (diminuindo)
+
+      // se angulo < 10 e X < 10 e y > 60 entáo mais 180
+      // segue ou entáo... se y > 100
+      // se angulo > 160 e x > 100
+
+      if (
+        (magnetoGiro.y > 80) ||
+        (graus > 150 && magnetoGiro.x > 90) ||
+        (graus < 10 && magnetoGiro.x < 10 && magnetoGiro.y > 60)
+      ) {
+        graus360 = graus + 180;
+
+      } else {
+        graus360 = graus
+        // console.log(
+        //   "graus: ",
+        //   graus360,
+        //   " - x: ",
+        //   magnetoGiro.x,
+        //   " - y: ",
+        //   magnetoGiro.y
+        // );
       }
+      console.log(
+        "graus > 150",
+        graus > 150,
+        "x > 90",
+        magnetoGiro.x > 90,
+        "graus: ",
+        graus360,
+        " - x: ",
+        magnetoGiro.x,
+        " - y: ",
+        magnetoGiro.y
+      );
+
+      // Tela para cima
+      // if (magnetoGiro.x >= 135 && magnetoGiro.y >= 90) {
+      //   console.log("Oitava 1");
+      //   magnetoGiro["avg"] = 180 - magnetoGiro.x;
+      // } else if (magnetoGiro.y >= 135 && magnetoGiro.x >= 90) {
+      //   console.log("Oitava 2");
+      //   magnetoGiro["avg"] = magnetoGiro.y - 90;
+      // } else if (magnetoGiro.y >= 135 && magnetoGiro.x < 90) {
+      //   console.log("Oitava 3");
+      //   magnetoGiro["avg"] = 270 - magnetoGiro.y;
+      // } else if (magnetoGiro.x <= 45 && magnetoGiro.y > 90) {
+      //   console.log("Oitava 4");
+      //   magnetoGiro["avg"] = 180 - magnetoGiro.x;
+      // } else if (magnetoGiro.x <= 45 && magnetoGiro.y <= 90) {
+      //   console.log("Oitava 5");
+      //   magnetoGiro["avg"] = 180 + magnetoGiro.x;
+      // } else if (magnetoGiro.y <= 45 && magnetoGiro.x <= 90) {
+      //   console.log("Oitava 6");
+      //   magnetoGiro["avg"] = 270 - magnetoGiro.y;
+      // } else if (magnetoGiro.y <= 45 && magnetoGiro.x >= 90) {
+      //   console.log("Oitava 7");
+      //   magnetoGiro["avg"] = 270 + magnetoGiro.y;
+      // } else if (magnetoGiro.x >= 135 && magnetoGiro.y <= 90) {
+      //   console.log("Oitava 8");
+      //   magnetoGiro["avg"] = 180 + magnetoGiro.x;
+      // }
 
       // if (magnetoGiro.x > 90)
       // // magnetoGiro x ou y + 180
@@ -208,8 +260,8 @@ y 360 => x < 180
   }
 
   setInterval(() => {
-    console.log("angulo: ", accelerometerAvg);
-    console.log("giro: ", magnetoGiro);
+    // console.log("angulo: ", accelerometerAvg);
+    // console.log("giro: ", magnetoGiro);
   }, 1000);
 
   Accelerometer.setUpdateInterval(150);
