@@ -1,7 +1,7 @@
 import { GLView } from "expo-gl";
 import { Renderer } from "expo-three";
 import { useEffect, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Share } from "react-native";
 import { Magnetometer, Barometer, Accelerometer } from "expo-sensors";
 import {
   PerspectiveCamera,
@@ -21,6 +21,8 @@ let camPos = 120;
 let rotX;
 let rotY;
 let rotZ;
+let rotation360;
+let bStartMeasure = false;
 // let magX = [];
 // let magY = [];
 // let magZ = [];
@@ -35,7 +37,7 @@ export default function App() {
   let magnetometerAvg = { x: 0, y: 0, z: 0 };
   let magnetoMax = { x: 0, y: 0, z: 0 };
   let magnetoMin = { x: 0, y: 0, z: 0 };
-  let magnetoGiro = { x: 0, y: 0, z: 0 };
+  let magnetRot = { x: 0, y: 0, z: 0 };
   let accelerometerAvg = { x: 0, y: 0, z: 0 };
   let timeout;
 
@@ -134,134 +136,98 @@ export default function App() {
   }
 
   function calcGiro() {
-    Object.keys(magnetoGiro).forEach((eixo) => {
-      magnetoGiro[eixo] = parseInt(
+    Object.keys(magnetRot).forEach((eixo) => {
+      magnetRot[eixo] = parseInt(
         (180 / Math.abs(magnetoMax[eixo] - magnetoMin[eixo])) *
           (magnetometerAvg[eixo] - magnetoMin[eixo])
       );
     });
     return updateGiroAng();
-
-    // Se Y > 90 e X > 90 então ANGULO = X + 180
-    // Se X > 90 e Y > 90 entáo ANGULO = Y + 180
-    // Se Y > 90 e Z > 90 então ANGULO = Z + 180
-    // Se X
   }
 
   function updateGiroAng() {
-    if (Math.abs(accelerometerAvg.x) > 90 && false) {
+    if (Math.abs(accelerometerAvg.x) > 90) {
       // Lateral para cima
-      //magnetoGiro z ou y + 180
-    } else if (Math.abs(accelerometerAvg.y) > 90 && false) {
-      // Ponta para cima
-      // magnetoGiro z ou x +180
-    } else if (Math.abs(accelerometerAvg.z) > 70) {
-      // Tela para cima
+      let rad = Math.atan(magnetometerAvg.z / magnetometerAvg.y);
 
-      let magnetude = Math.sqrt(
-        magnetometerAvg.x ** 2 + magnetometerAvg.y ** 2
-      );
-      let radianos = Math.atan(magnetometerAvg.x / magnetometerAvg.y);
-      // if (radianos < 0) {
-      //   radianos = radianos + 2 * Math.PI;
-      // }
-      const graus = (radianos * (180 / Math.PI))+90;
-      let graus360
-
-      // de x: 0 / y: 60 a x: 178 / y: 80 (diminuindo)
-
-      // se angulo < 10 e X < 10 e y > 60 entáo mais 180
-      // segue ou entáo... se y > 100
-      // se angulo > 160 e x > 100
+      const degrees = parseInt(rad * (180 / Math.PI)) + 90;
 
       if (
-        (magnetoGiro.y > 80) ||
-        (graus > 150 && magnetoGiro.x > 90) ||
-        (graus < 10 && magnetoGiro.x < 10 && magnetoGiro.y > 60)
+        magnetRot.y > 105 ||
+        (degrees > 150 && magnetRot.z > 90) ||
+        (degrees < 15 && magnetRot.z < 10 && magnetRot.y > 90)
       ) {
-        graus360 = graus + 180;
-
+        rotation360 = degrees + 180;
       } else {
-        graus360 = graus
-        // console.log(
-        //   "graus: ",
-        //   graus360,
-        //   " - x: ",
-        //   magnetoGiro.x,
-        //   " - y: ",
-        //   magnetoGiro.y
-        // );
+        rotation360 = degrees;
       }
-      console.log(
-        "graus > 150",
-        graus > 150,
-        "x > 90",
-        magnetoGiro.x > 90,
-        "graus: ",
-        graus360,
-        " - x: ",
-        magnetoGiro.x,
-        " - y: ",
-        magnetoGiro.y
-      );
 
+      // console.log(
+      //   "giro: ",
+      //   degrees,
+      //   " - rot360: ",
+      //   rotation360,
+      //   " - x: ",
+      //   magnetRot.x,
+      //   " - y: ",
+      //   magnetRot.y,
+      //   " - z: ",
+      //   magnetRot.z
+      // );
+    } else if (Math.abs(accelerometerAvg.y) > 90) {
+      // Ponta para cima
+      let rad = Math.atan(magnetometerAvg.z / magnetometerAvg.x);
+
+      const degrees = parseInt(rad * (180 / Math.PI)) + 90;
+
+      if (
+        (magnetRot.z < 180 &&
+          ((magnetRot.z > 0 && degrees > 130) || magnetRot.z > 10) &&
+          magnetRot.x < 95) ||
+        (degrees > 160 && magnetRot.z < 10 && magnetRot.x < 105) ||
+        (degrees < 15 && magnetRot.z > 100 && magnetRot.x < 105)
+      ) {
+        rotation360 = degrees + 180;
+      } else {
+        rotation360 = degrees;
+      }
+
+      // console.log(
+      //   "giro: ",
+      //   degrees,
+      //   " - rot360: ",
+      //   rotation360,
+      //   " - x: ",
+      //   magnetRot.x,
+      //   " - y: ",
+      //   magnetRot.y,
+      //   " - z: ",
+      //   magnetRot.z
+      // );
+    } else if (Math.abs(accelerometerAvg.z) > 90) {
       // Tela para cima
-      // if (magnetoGiro.x >= 135 && magnetoGiro.y >= 90) {
-      //   console.log("Oitava 1");
-      //   magnetoGiro["avg"] = 180 - magnetoGiro.x;
-      // } else if (magnetoGiro.y >= 135 && magnetoGiro.x >= 90) {
-      //   console.log("Oitava 2");
-      //   magnetoGiro["avg"] = magnetoGiro.y - 90;
-      // } else if (magnetoGiro.y >= 135 && magnetoGiro.x < 90) {
-      //   console.log("Oitava 3");
-      //   magnetoGiro["avg"] = 270 - magnetoGiro.y;
-      // } else if (magnetoGiro.x <= 45 && magnetoGiro.y > 90) {
-      //   console.log("Oitava 4");
-      //   magnetoGiro["avg"] = 180 - magnetoGiro.x;
-      // } else if (magnetoGiro.x <= 45 && magnetoGiro.y <= 90) {
-      //   console.log("Oitava 5");
-      //   magnetoGiro["avg"] = 180 + magnetoGiro.x;
-      // } else if (magnetoGiro.y <= 45 && magnetoGiro.x <= 90) {
-      //   console.log("Oitava 6");
-      //   magnetoGiro["avg"] = 270 - magnetoGiro.y;
-      // } else if (magnetoGiro.y <= 45 && magnetoGiro.x >= 90) {
-      //   console.log("Oitava 7");
-      //   magnetoGiro["avg"] = 270 + magnetoGiro.y;
-      // } else if (magnetoGiro.x >= 135 && magnetoGiro.y <= 90) {
-      //   console.log("Oitava 8");
-      //   magnetoGiro["avg"] = 180 + magnetoGiro.x;
-      // }
 
-      // if (magnetoGiro.x > 90)
-      // // magnetoGiro x ou y + 180
-      // magnetoGiro["avg"] = (magnetoGiro.x + (360 - magnetoGiro.y) + 180) / 2;
+      let rad = Math.atan(magnetometerAvg.x / magnetometerAvg.y);
+
+      const degrees = parseInt(rad * (180 / Math.PI)) + 90;
+
+      if (
+        magnetRot.y > 105 ||
+        (degrees > 150 && magnetRot.x > 90) ||
+        (degrees < 10 && magnetRot.x < 10 && magnetRot.y > 60)
+      ) {
+        rotation360 = degrees + 180;
+      } else {
+        rotation360 = degrees;
+      }
     }
 
-    // if (Math.abs(accelerometerAvg.x) > 90 && false) {
-    //   //magnetoGiro z ou y + 180
-    //   magnetoGiro["avg"] = (magnetoGiro.z + magnetoGiro.y + 90) / 2;
-    // } else if (Math.abs(accelerometerAvg.y) > 90 && false) {
-    //   // magnetoGiro z ou x +180
-    //   magnetoGiro["avg"] = (magnetoGiro.z + magnetoGiro.x + 90) / 2;
-    // } else if (Math.abs(accelerometerAvg.z) > 90) {
-    //   if (magnetoGiro.x > )
-    //   // magnetoGiro x ou y + 180
-    //   magnetoGiro["avg"] = (magnetoGiro.x + (360 - magnetoGiro.y) + 180) / 2;
-    // }
-
-    // magnetoGiro["avg"] > 360
-    //   ? (magnetoGiro["avg"] = magnetoGiro["avg"] - 360)
-    //   : "";
-    /*
-y 0 => x > 180
-y 360 => x < 180
- */
-    return;
+    return bStartMeasure ? updateDegreeMov() : "";
   }
 
   setInterval(() => {
     // console.log("angulo: ", accelerometerAvg);
-    // console.log("giro: ", magnetoGiro);
+    // console.log("giro: ", rotation360);
   }, 1000);
 
   Accelerometer.setUpdateInterval(150);
@@ -504,13 +470,14 @@ y 360 => x < 180
 
   const stopMeasure = async () => {
     console.log("stop measure");
+    bStartMeasure = false;
     compile();
-    clearInterval(measureStarted);
   };
 
   const startMeasure = async () => {
     console.log("start measure");
-    measureStarted = setInterval(updateZaxis, 36);
+    msrValues["degreeMov"] = {};
+    bStartMeasure = true;
   };
 
   const styles = StyleSheet.create({
@@ -680,6 +647,7 @@ let msrValues = {
   move: { x: 0, y: 0 },
   lastMoves: [],
   zReg: {},
+  degreeMov: {},
 };
 const tol = 0.3;
 const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
@@ -708,7 +676,7 @@ async function pointsFilter(angle, distance) {
     msrValues["lastValues"][indexAngle].shift();
   }
 
-  indexDistance > 0 //&& indexAngle < 160
+  indexDistance > 0 && indexAngle % 3 === 0
     ? msrValues["lastValues"][indexAngle].push(indexDistance)
     : "";
 }
@@ -717,6 +685,11 @@ async function updateZaxis() {
   const newValues = { ...msrValues["avgValues"] };
   zAxis += 1; // normal é 50
   return (msrValues["zReg"][zAxis] = newValues);
+}
+
+async function updateDegreeMov() {
+  const newValues = { ...msrValues["avgValues"] };
+  return (msrValues["degreeMov"][rotation360] = newValues);
 }
 
 async function bufferReceive(data) {
@@ -764,22 +737,69 @@ async function bufferReceive(data) {
   return;
 }
 
-const compile = async () => {
-  if (msrValues["zReg"]) {
-    msrValues["xyz"] = [];
-    pointsCoordinates = [];
-    Object.keys(msrValues["zReg"]).forEach((zReg) => {
-      Object.keys(msrValues["zReg"][zReg]).forEach(async (angle) => {
-        await dataServices
-          .lidarToXYZ(
-            angle,
-            msrValues["zReg"][zReg][angle],
-            parseInt(zReg * incrZ)
-          )
-          .then((res) => msrValues["xyz"].push(res));
-      });
-    });
+const xyzGenerate = async () => {
+  msrValues["xyz"] = [];
+  pointsCoordinates = [];
+  console.log("iniciando compilação: ", new Date());
 
-    pointsCoordinates = msrValues["xyz"];
-  }
+  return new Promise((resolve, reject) => {
+    if (msrValues["zReg"] && false) {
+      Object.keys(msrValues["zReg"]).forEach((zReg) => {
+        Object.keys(msrValues["zReg"][zReg]).forEach(async (angle) => {
+          await dataServices
+            .lidarToXYZ(
+              angle,
+              msrValues["zReg"][zReg][angle],
+              parseInt(zReg * incrZ)
+            )
+            .then((res) => msrValues["xyz"].push(res));
+        });
+      });
+    } else if (msrValues["degreeMov"]) {
+      // console.log("Valores recebidos: ", msrValues['degreeMov'])
+      Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
+        // console.log('degreeMag: ', degreeMag)
+        if (degreeMag % 5 === 0) {
+          Object.keys(msrValues["degreeMov"][degreeMag]).forEach(
+            async (degreeLidar) => {
+              resolve(
+                await dataServices
+                  .lidarToXYZ(
+                    degreeLidar,
+                    msrValues["degreeMov"][degreeMag][degreeLidar],
+                    0
+                  )
+                  .then(async (res) => {
+                    await dataServices
+                      .lidarToXYZ(degreeMag, res.x, 0)
+                      .then((res2) => {
+                        return msrValues["xyz"].push({
+                          x: res2.y,
+                          y: res.y,
+                          z: res2.x,
+                        });
+                      });
+                  })
+                  .catch((err) => console.log(err))
+              );
+            }
+          );
+        }
+      });
+    }
+
+    // return (
+    //   pointsCoordinates = msrValues["xyz"],
+    //   console.log("Finalizando compilação: ", new Date()),
+    //   console.log("Dados xyz: ", msrValues["xyz"]),
+    //   dataServices.shareFile(await dataServices.colladaSave(msrValues["xyz"]))
+    // );
+  });
 };
+
+function compile() {
+  xyzGenerate().then(async () => {
+    (pointsCoordinates = msrValues["xyz"]),
+      dataServices.shareFile(await dataServices.colladaSave(msrValues["xyz"]));
+  });
+}

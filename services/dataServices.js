@@ -1,3 +1,7 @@
+import * as FileSystem from "expo-file-system";
+import { Share } from "react-native";
+const collada = require('./collada')
+
 class DataServices {
   // Pooling function
   async poolingData(data, newValue, size) {
@@ -7,7 +11,7 @@ class DataServices {
       dataTmp.shift();
     }
 
-    newValue !== '' ? dataTmp.push(newValue) : '';
+    newValue !== "" ? dataTmp.push(newValue) : "";
 
     return dataTmp;
   }
@@ -26,10 +30,11 @@ class DataServices {
   async lidarToXYZ(angleDegrees, distance, z) {
     let coordinates = {};
     const angleRadians = (angleDegrees * Math.PI) / 180.0;
+    const zRadians = (z * Math.PI) / 180.0;
     coordinates.x = parseInt(distance * Math.cos(angleRadians));
     coordinates.y = parseInt(distance * Math.sin(angleRadians));
-    coordinates.z = z === undefined ? 0 : z;
-
+    // coordinates.z = z === undefined ? 0 : z;
+    coordinates.z = parseInt(distance * Math.cos(zRadians));
     return coordinates;
   }
 
@@ -52,7 +57,12 @@ class DataServices {
   }
 
   // Pipe the data into another stream (like a parser or standard out)
-  async averageCalcSemOutliers(data, desviosPadraoLimite, fAverageCalc, fCalcStdDeviation) {
+  async averageCalcSemOutliers(
+    data,
+    desviosPadraoLimite,
+    fAverageCalc,
+    fCalcStdDeviation
+  ) {
     // Ordena os dados
     const orderedData = [...data].sort((a, b) => {
       if (a > b) return 1;
@@ -67,7 +77,9 @@ class DataServices {
     // Filtra os valores que não são considerados outliers
     const filteredData = orderedData.filter((valor) => {
       const distanciaEmDesviosPadrao = Math.abs(valor - media) / stdDeviation;
-      return desviosPadraoLimite > 0 ? distanciaEmDesviosPadrao <= desviosPadraoLimite : true;
+      return desviosPadraoLimite > 0
+        ? distanciaEmDesviosPadrao <= desviosPadraoLimite
+        : true;
     });
 
     // Calcula a média dos valores filtrados
@@ -108,6 +120,30 @@ class DataServices {
     const average = sum / array.length;
 
     return average;
+  }
+
+  async colladaSave(conteudo) {
+    const xmlCollada = await collada(conteudo)
+    console.log("iniciando salvamento do arquivo com o conteudo: ", xmlCollada )
+    const filePath = `${FileSystem.cacheDirectory}cloudPoints.pdf`;
+
+    try {
+      await FileSystem.writeAsStringAsync(filePath, xmlCollada);
+      console.log("File has been saved");
+    } catch (erro) {
+      console.error("Error to save the file:", erro);
+    }
+    return filePath;
+  }
+
+  async shareFile(receivedFilePath) {
+    const fileToSend = await FileSystem.readAsStringAsync(receivedFilePath);
+
+    await Share.share({
+      title: "cloudPoints",
+      message: fileToSend,
+      url: receivedFilePath,
+    });
   }
 }
 
