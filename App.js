@@ -228,7 +228,8 @@ export default function App() {
   setInterval(() => {
     // console.log("angulo: ", accelerometerAvg);
     // console.log("giro: ", rotation360);
-  }, 1000);
+    // console.log(msrValues['soft'], "soft");
+  }, 10000);
 
   Accelerometer.setUpdateInterval(150);
   Accelerometer.addListener(async (res) => {
@@ -359,11 +360,11 @@ export default function App() {
     let points = new Points(pointsGeometry, pointsMaterial);
     scene.add(points);
 
-    const updatePoints = () => {
-      points = {};
-      positions = [];
-      scene.children = [];
-      if (pointsCoordinates.length > 1) {
+    const updateScreen = () => {
+      if (pointsCoordinates.length > 10) {
+        points = {};
+        positions = [];
+        scene.children = [];
         console.log("updating points");
         pointsCoordinates.forEach((coord) => {
           positions.push(coord.x / 100, coord.y / 100, coord.z / 100);
@@ -377,7 +378,7 @@ export default function App() {
       }
     };
 
-    // const updatePoints = () => {
+    // const updateScreen = () => {
     //   let newPositions = []
     //   pointsCoordinates.forEach((coord) => {
     //     newPositions.push(coord.x / 100, coord.y / 100, coord.z / 100);
@@ -398,7 +399,7 @@ export default function App() {
     //   return points.geometry.attributes.position = newPositions
     // };
 
-    setInterval(updatePoints, 15000);
+    setInterval(updateScreen, 1000);
 
     let aumenta = false;
 
@@ -648,10 +649,13 @@ let msrValues = {
   lastMoves: [],
   zReg: {},
   degreeMov: {},
+  soft: {},
+  reliabity: {}
 };
-const tol = 0.3;
+const tol = 0;
 const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
-const qtyMsgAvgCalc = 20; // Quantity of measures to calculate the average
+const qtyMsgAvgCalc = 4; // Quantity of measures to calculate the average
+const qtyNeiborhoodVerify = 3;
 //36 ms = 5cm
 let measureStarted;
 let zAxis = 0;
@@ -659,8 +663,15 @@ let counter = 0;
 const incrZ = 50;
 
 async function pointsFilter(angle, distance) {
+  // console.log(angle,distance,"angle/position")
   let indexAngle = parseInt(angle);
   let indexDistance = parseInt(distance);
+
+  // await dataServices.lidarToXYZ(
+  //   angle - indexAngle,
+  //   distance,
+  //   0
+  // );
 
   msrValues["lastValues"][indexAngle] =
     msrValues["lastValues"][indexAngle] || [];
@@ -673,13 +684,113 @@ async function pointsFilter(angle, distance) {
       dataServices.calcStdDeviation
     );
     average > 0 ? (msrValues["avgValues"][indexAngle] = average) : "";
+
     msrValues["lastValues"][indexAngle].shift();
   }
 
-  indexDistance > 0 && indexAngle % 3 === 0
+  async function verifyNeiborhood(degree, distance) {
+    const neibBefore = parseInt(degree - qtyNeiborhoodVerify);
+    const neibAfter = parseInt(degree + qtyNeiborhoodVerify);
+    const neibBetweenBef = parseInt(
+      degree - Math.ceil(qtyNeiborhoodVerify / 2)
+    );
+    const neibBetweenAft = parseInt(
+      degree + Math.ceil(qtyNeiborhoodVerify / 2)
+    );
+    // console.log("inicios e fins: ", neibBefore, ' / ', neibAfter, ' / ', neibBetweenBef, ' / ', neibBetweenAft)
+    let neibValuesBef = [];
+    let neibValuesAft = [];
+    let neibValuesBet = [];
+    for (let i = neibBefore; i < neibAfter; i++) {
+      let iDegree = i < 0 ? i + 360 : i > 360 ? i - 360 : i;
+      if (msrValues["avgValues"][iDegree] !== undefined) {
+        if (i <= degree) {
+          neibValuesBef.push(msrValues["avgValues"][iDegree]);
+        }
+        if (i >= degree) {
+          neibValuesAft.push(msrValues["avgValues"][iDegree]);
+        }
+        if (i >= neibBetweenBef && i <= neibBetweenAft) {
+          neibValuesBet.push(msrValues["avgValues"][iDegree]);
+        }
+      }
+    }
+    return await avgNeiborhood(neibValuesBef, neibValuesAft, neibValuesBet);
+  }
+
+  async function avgNeiborhood(before, after, between) {
+    // console.log("Valores Recebidos: ", before, after, between)
+    return [
+      before.reduce((acc, current) => {
+        return acc + current;
+      }, 0) / before.length,
+      after.reduce((acc, current) => {
+        return acc + current;
+      }, 0) / before.length,
+      between.reduce((acc, current) => {
+        return acc + current;
+      }, 0) / before.length,
+    ];
+  }
+
+  await verifyNeiborhood(angle, distance).then((res) => {
+    // console.log("indexDistance: ", indexDistance, ' - resposta: ', res)
+    if (
+      (indexDistance >= (res[0] * 0.9) && indexDistance <= (res[0] * 1.1)) ||
+      (indexDistance >= (res[1] * 0.9) && indexDistance <= (res[1] * 1.1)) ||
+      (indexDistance >= (res[2] * 0.9) && indexDistance <= (res[2] * 1.1)) ||
+      false //(res[0] === isNaN && res[1] === isNaN && res[2] === isNaN)
+    ) {
+      msrValues['soft'] = msrValues['soft'] || {}
+      msrValues['soft'][indexAngle] = indexDistance
+    } else {
+      // msrValues['soft'][indexAngle] = parseInt((res[0] + res[1] + res[2] + indexDistance)/3)
+    }
+    msrValues['reliabity'][indexAngle] = 100 * (msrValues['soft'][indexAngle] / msrValues['avgValues'][indexAngle])
+
+    // console.log("conf: ", msrValues['reliabity'][indexAngle]), ' - ', msrValues['soft'][indexAngle]
+  });
+
+  return indexDistance > 0
     ? msrValues["lastValues"][indexAngle].push(indexDistance)
     : "";
+  // || (
+  //   (indexDistance >= (res[0] * 0, 9) &&
+  //     indexDistance <= (res[0] * 1, 1)) ||
+  //     (indexDistance >= (res[1] * 0, 9) &&
+  //       indexDistance <= (res[1] * 1, 1)) ||
+  //     (indexDistance >= (res[2] * 0, 9) &&
+  //       indexDistance <= (res[2] * 1, 1)) ||
+  //     res[0] === isNaN ||
+  //     res[1] === isNaN ||
+  //     res[2] === isNaN
+  // )
 }
+
+async function updateXYZ() {
+  msrValues["xyz"] = [];
+  pointsCoordinates = [];
+  let source
+  Object.keys(msrValues['soft']).length>10 ? source = 'soft' : source = 'avgValues'
+  Object.keys(msrValues[source]).forEach(async (degree) => {
+    if (msrValues[source][degree] > 0 && degree % 3 ===0) {
+      await dataServices
+      .lidarToXYZ(degree, msrValues[source][degree], 0)
+      .then((res) => {
+        return msrValues["xyz"].push({
+          x: res.x,
+          y: res.y,
+          z: res.z,
+        });
+      })
+      .catch((err) => console.log(err));
+    }
+
+  });
+  return (pointsCoordinates = msrValues["xyz"]);
+}
+
+setInterval(updateXYZ, 200);
 
 async function updateZaxis() {
   const newValues = { ...msrValues["avgValues"] };
@@ -688,7 +799,7 @@ async function updateZaxis() {
 }
 
 async function updateDegreeMov() {
-  const newValues = { ...msrValues["avgValues"] };
+  const newValues = { ...msrValues["soft"] };
   return (msrValues["degreeMov"][rotation360] = newValues);
 }
 
