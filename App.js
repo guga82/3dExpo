@@ -670,6 +670,7 @@ let busy = false;
 async function pointsFilter(degreePF, distance) {
   let indexAngle = parseInt(degreePF / 100);
   let indexDistance = parseInt(distance);
+  // console.log('pointsFilter at:  ', new Date())
 
   // msrValues["last360"][indexAngle] =
   //   msrValues["last360"][indexAngle] || [];
@@ -678,12 +679,12 @@ async function pointsFilter(degreePF, distance) {
 
   if (lastDegree > degreePF && busy === false) {
     busy = true;
-    console.log('Primeiro filter at:  ', new Date(),  msrValues['last360'])
+    counter++
+    console.log('Primeiro filter at:  ', new Date())
     Object.keys(msrValues["last360"]).forEach(async (degree) => {
       const distance360 = msrValues["last360"][degree];
 
       await verifyNeiborhood(degree, distance360).then((res) => {
-        // console.log("indexDistance: ", indexDistance, ' - resposta: ', res)
         if (
           (distance360 >= res[0] * percNeibInf &&
             distance360 <= res[0] * percNeibSup) ||
@@ -694,6 +695,8 @@ async function pointsFilter(degreePF, distance) {
           false //(res[0] === isNaN && res[1] === isNaN && res[2] === isNaN)
         ) {
           msrValues["soft"][degree] = distance360;
+        } else {
+          msrValues["soft"][degree] = (distance360 + ((res[0]+res[1]+res[2])/3)) / 2;
         }
 
         msrValues["reliabity"][degree] =
@@ -707,30 +710,34 @@ async function pointsFilter(degreePF, distance) {
     lastDegree = degreePF;
   }
 
-  async function verifyNeiborhood(degree) {
-    const neibBefore = parseInt(degree - qtyNeiborhoodVerify);
-    const neibAfter = parseInt(degree + qtyNeiborhoodVerify);
+  async function verifyNeiborhood(degreeRec) {
+    //console.log('verifyNeiborhood at:  ', new Date())
+    const neibBefore = parseInt(parseInt(degreeRec) - parseInt(qtyNeiborhoodVerify));
+    const neibAfter = parseInt(parseInt(degreeRec) + parseInt(qtyNeiborhoodVerify));
     const neibBetweenBef = parseInt(
-      degree - Math.ceil(qtyNeiborhoodVerify / 2)
+      degreeRec - Math.ceil(qtyNeiborhoodVerify / 2)
     );
     const neibBetweenAft = parseInt(
-      degree + Math.ceil(qtyNeiborhoodVerify / 2)
+      degreeRec + Math.ceil(qtyNeiborhoodVerify / 2)
     );
     let neibValuesBef = [];
     let neibValuesAft = [];
     let neibValuesBet = [];
+    console.log("Angulo atual: ", degreeRec, "Angulo before: ", neibBefore, " - Angulo despues: ", neibAfter)
+
     for (let i = neibBefore; i < neibAfter; i++) {
+      // console.log("Angulo Testado: ", i)
       const iDegree = i < 0 ? i + 360 : i > 360 ? i - 360 : i;
       const distance = msrValues["last360"][iDegree];
       if (msrValues["last360"][iDegree] !== undefined) {
-        if (i <= degree) {
-          // neibValuesBef.push(distance);
+        if (i <= degreeRec) {
+          neibValuesBef.push(distance);
         }
-        if (i >= degree) {
-          // neibValuesAft.push(distance);
+        if (i >= degreeRec) {
+          neibValuesAft.push(distance);
         }
         if (i >= neibBetweenBef && i <= neibBetweenAft) {
-          // neibValuesBet.push(distance);
+          neibValuesBet.push(distance);
         }
       }
     }
@@ -738,6 +745,7 @@ async function pointsFilter(degreePF, distance) {
   }
 
   async function avgNeiborhood(before, after, between) {
+    //console.log('avgNeiborhood at:  ', new Date())
     return [
       before.reduce((acc, current) => {
         return acc + current;
@@ -751,16 +759,16 @@ async function pointsFilter(degreePF, distance) {
     ];
   }
 
-  return //await bufferSize();
+  return
 }
 
 async function bufferSize() {
-
+  //console.log('bufferSize START at:  ', new Date())
 
   try {
     Object.keys(msrValues["soft"]).forEach(async (degree) => {
+      msrValues["lastValues"][degree] = msrValues["lastValues"][degree]  || []
       msrValues["lastValues"][degree].push(msrValues["soft"][degree]);
-  
       if (msrValues["lastValues"][degree].length >= qtyMsgAvgCalc) {
         // let average = await dataServices.averageCalcSemOutliers(
         //   msrValues["lastValues"][degree],
@@ -778,7 +786,7 @@ async function bufferSize() {
     console.log('Falha ao executar BufferSize: ',e)
   }
 
-  return console.log('Fim do bufferSize at: ', new Date())
+  return setTimeout(()=>busy=false, 50) //console.log(Object.keys(msrValues['soft']).length, 'endBufferSize at:  ', new Date()) //console.log('Fim do bufferSize at: ', new Date())
 }
 
 async function updateXYZ() {
@@ -810,7 +818,7 @@ async function updateXYZ() {
   return (pointsCoordinates = msrValues["xyz"]);
 }
 
-setInterval(updateXYZ, 3000);
+// setInterval(updateXYZ, 3000);
 
 async function updateZaxis() {
   const newValues = { ...msrValues["avgValues"] };
