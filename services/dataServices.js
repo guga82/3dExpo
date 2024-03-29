@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system";
 import { Share } from "react-native";
-const collada = require('./collada')
+const collada = require("./collada");
 
 class DataServices {
   // Pooling function
@@ -27,14 +27,15 @@ class DataServices {
   }
 
   // Função para converter ângulo e medida em coordinates XYZ
-  async lidarToXYZ(angleDegrees, distance, z) {
+  async lidarToXYZ(angleDegrees, distance, zDegree) {
     let coordinates = {};
     const angleRadians = (angleDegrees * Math.PI) / 180.0;
-    const zRadians = (z * Math.PI) / 180.0;
+    const zRadians = (zDegree * Math.PI) / 180.0;
     coordinates.x = parseInt(distance * Math.cos(angleRadians));
     coordinates.y = parseInt(distance * Math.sin(angleRadians));
     // coordinates.z = z === undefined ? 0 : z;
-    coordinates.z = parseInt(distance * Math.cos(zRadians));
+    coordinates.z =
+      zDegree === undefined ? 0 : parseInt(distance * Math.cos(zRadians));
     return coordinates;
   }
 
@@ -61,7 +62,8 @@ class DataServices {
     data,
     desviosPadraoLimite,
     fAverageCalc,
-    fCalcStdDeviation
+    fCalcStdDeviation,
+    weight
   ) {
     // Ordena os dados
     const orderedData = [...data].sort((a, b) => {
@@ -71,12 +73,13 @@ class DataServices {
     });
 
     // Calcula a média e o desvio padrão
-    const media = await fAverageCalc(orderedData);
+    const media = await fAverageCalc(orderedData, weight);
     const stdDeviation = await fCalcStdDeviation(orderedData, media);
 
     // Filtra os valores que não são considerados outliers
     const filteredData = orderedData.filter((valor) => {
       const distanciaEmDesviosPadrao = Math.abs(valor - media) / stdDeviation;
+      // console.log('desvio Padrão: ', distanciaEmDesviosPadrao)
       return desviosPadraoLimite > 0
         ? distanciaEmDesviosPadrao <= desviosPadraoLimite
         : true;
@@ -84,17 +87,21 @@ class DataServices {
 
     // Calcula a média dos valores filtrados
 
-    return await fAverageCalc(filteredData);
+    return await fAverageCalc(filteredData, weight);
   }
 
-  async averageCalc(data) {
+  async averageCalc(data, weight) {
     if (data[0] === undefined) {
       return 0;
     }
-    return (
-      (await data.reduce((acc, valor) => acc + parseInt(valor), 0)) /
-      data.length
-    );
+
+    let average = await data.reduce((acc, value, index) => {
+      acc["soma"] += parseInt(value);
+      acc["weight"] += 100 - (weight * index)
+      return acc;
+    }, {})
+
+    return average.soma / average.weight
   }
 
   async calcStdDeviation(data, media) {
@@ -107,7 +114,7 @@ class DataServices {
   }
 
   // Função para calcular a média dos valores de um array
-  async avgCalc(array) {
+  async avgCalcApagar(array) {
     // Verifica se o array está vazio
     if (array.length === 0) {
       return 0; // Retorna 0 se o array estiver vazio para evitar divisão por zero
@@ -123,8 +130,8 @@ class DataServices {
   }
 
   async colladaSave(conteudo) {
-    const xmlCollada = await collada(conteudo)
-    console.log("iniciando salvamento do arquivo com o conteudo: ", xmlCollada )
+    const xmlCollada = await collada(conteudo);
+    console.log("iniciando salvamento do arquivo com o conteudo: ", xmlCollada);
     const filePath = `${FileSystem.cacheDirectory}cloudPoints.pdf`;
 
     try {
