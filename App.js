@@ -314,7 +314,7 @@ export default function App() {
   // console.log("Iniciado WebSocket");
 
   ws.onopen = (event) => {
-    console.log("Event data: ", event.data);
+    console.log("Event data: ", event);
   };
   ws.onmessage = async function (event) {
     const lidarData = event.data.split(",");
@@ -668,8 +668,6 @@ let lastDegree = 0;
 let busy = false;
 
 async function pointsFilter(degreePF, distance) {
-  // console.log(degree,distance,"degree/position")
-  // console.log("iniciando pointsFilter as: ", new Date())
   let indexAngle = parseInt(degreePF / 100);
   let indexDistance = parseInt(distance);
 
@@ -679,8 +677,8 @@ async function pointsFilter(degreePF, distance) {
   indexDistance > 0 ? (msrValues["last360"][indexAngle] = indexDistance) : "";
 
   if (lastDegree > degreePF && busy === false) {
-    // console.log("iniciando foreach degreePF as: ", new Date())
     busy = true;
+    console.log('Primeiro filter at:  ', new Date(),  msrValues['last360'])
     Object.keys(msrValues["last360"]).forEach(async (degree) => {
       const distance360 = msrValues["last360"][degree];
 
@@ -704,12 +702,12 @@ async function pointsFilter(degreePF, distance) {
     });
 
     lastDegree = degreePF;
+    bufferSize();
   } else {
     lastDegree = degreePF;
   }
 
   async function verifyNeiborhood(degree) {
-    // console.log("iniciando verifyNeiborhood as: ", new Date())
     const neibBefore = parseInt(degree - qtyNeiborhoodVerify);
     const neibAfter = parseInt(degree + qtyNeiborhoodVerify);
     const neibBetweenBef = parseInt(
@@ -718,11 +716,9 @@ async function pointsFilter(degreePF, distance) {
     const neibBetweenAft = parseInt(
       degree + Math.ceil(qtyNeiborhoodVerify / 2)
     );
-    // console.log("inicios e fins: ", neibBefore, ' / ', neibAfter, ' / ', neibBetweenBef, ' / ', neibBetweenAft)
     let neibValuesBef = [];
     let neibValuesAft = [];
     let neibValuesBet = [];
-    // console.log("iniciando verifyNeiborhood BEFORE for as: ", new Date())
     for (let i = neibBefore; i < neibAfter; i++) {
       const iDegree = i < 0 ? i + 360 : i > 360 ? i - 360 : i;
       const distance = msrValues["last360"][iDegree];
@@ -742,8 +738,6 @@ async function pointsFilter(degreePF, distance) {
   }
 
   async function avgNeiborhood(before, after, between) {
-    // console.log("iniciando avgNeiborhood as: ", new Date())
-    // console.log("Valores Recebidos: ", before, after, between)
     return [
       before.reduce((acc, current) => {
         return acc + current;
@@ -757,11 +751,10 @@ async function pointsFilter(degreePF, distance) {
     ];
   }
 
-  return await bufferSize();
+  return //await bufferSize();
 }
 
 async function bufferSize() {
-  // console.log("iniciando bufferSize as: ", new Date())
 
 
   try {
@@ -785,7 +778,7 @@ async function bufferSize() {
     console.log('Falha ao executar BufferSize: ',e)
   }
 
-  return
+  return console.log('Fim do bufferSize at: ', new Date())
 }
 
 async function updateXYZ() {
@@ -817,7 +810,7 @@ async function updateXYZ() {
   return (pointsCoordinates = msrValues["xyz"]);
 }
 
-// setInterval(updateXYZ, 3000);
+setInterval(updateXYZ, 3000);
 
 async function updateZaxis() {
   const newValues = { ...msrValues["avgValues"] };
@@ -831,7 +824,6 @@ function updateDegreeMov() {
 }
 
 async function bufferReceive(data) {
-  // console.log("iniciando bufferReceive as: ", new Date())
   let byteSize = parseInt(data[2], 16);
 
   if (byteSize !== 58) {
@@ -884,9 +876,7 @@ const xyzGenerate = async () => {
         });
       });
     } else if (msrValues["degreeMov"]) {
-      // console.log("Valores recebidos: ", msrValues['degreeMov'])
       Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
-        // console.log('degreeMag: ', degreeMag)
         if (degreeMag % 5 === 0) {
           Object.keys(msrValues["degreeMov"][degreeMag]).forEach(
             async (degreeLidar) => {
