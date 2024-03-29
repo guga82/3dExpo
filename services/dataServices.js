@@ -90,14 +90,18 @@ class DataServices {
     return await fAverageCalc(filteredData, weight);
   }
 
-  async averageCalc(data, weight) {
+  async averageCalc(data, weightRec) {
+    let weight2 = weightRec === undefined ? 0 : weightRec
     if (data[0] === undefined) {
       return 0;
     }
 
     let average = await data.reduce((acc, value, index) => {
-      acc["soma"] += parseInt(value);
-      acc["weight"] += 100 - (weight * index)
+      const peso = 100 + (weight2 * index)
+      acc["soma"] = acc["soma"] || 0
+      acc["weight"] = acc["weight"] || 0
+      acc["soma"] += parseInt(value) * peso;
+      acc["weight"] += peso
       return acc;
     }, {})
 
