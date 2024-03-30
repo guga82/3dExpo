@@ -23,6 +23,7 @@ let rotY;
 let rotZ;
 let rotation360;
 let bStartMeasure = false;
+let accelerometer;
 // let magX = [];
 // let magY = [];
 // let magZ = [];
@@ -279,7 +280,7 @@ export default function App() {
         0
       )
     );
-    return;
+    return (accelerometer = accelerometerAvg);
   }
 
   // Barometer.setUpdateInterval(50);
@@ -379,7 +380,7 @@ export default function App() {
       }
     };
 
-    setInterval(updateScreen, 1000);
+    setInterval(updateScreen, 500);
 
     let aumenta = false;
 
@@ -452,16 +453,16 @@ export default function App() {
   const stopMeasure = async () => {
     console.log("stop measure");
     bStartMeasure = false;
-    bUpdateXyz=false
+    bUpdateXyz = false;
     compile();
   };
 
   const startMeasure = async () => {
     console.log("start measure");
-    bStartMeasure === false ? msrValues["degreeMov"] = {} : '';
+    bStartMeasure === false ? (msrValues["degreeMov"] = {}) : "";
     bStartMeasure = true;
-    updateDegreeMov()
-    bUpdateXyz = true
+    updateDegreeMov();
+    bUpdateXyz = true;
   };
 
   const styles = StyleSheet.create({
@@ -543,7 +544,7 @@ export default function App() {
       {/* <Text>Pressure: {averagePressure} hPa</Text> */}
       {/* </View> */}
       <View style={styles.buttonContainer}>
-      {/* <Text style={styles.text}>Magnetometer:</Text>
+        {/* <Text style={styles.text}>Magnetometer:</Text>
       <Text style={styles.text}>x: {x.toFixed(1)}</Text>
       <Text style={styles.text}>y: {y.toFixed(1)}</Text>
       <Text style={styles.text}>z: {z.toFixed(1)}</Text> */}
@@ -641,31 +642,35 @@ let msrValues = {
 const tol = 0;
 const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
 const qtyMsgAvgCalc = 4; // Quantity of measures to calculate the average
-const qtyNeiborhoodVerify = 3;
+const qtyNeiborhoodVerify = 5;
 //36 ms = 5cm
 let measureStarted;
 let zAxis = 0;
 let counter = 0;
 const incrZ = 50;
-const percNeibInf = 0.0;
-const percNeibSup = 2;
+const percNeibInf = 0.7;
+const percNeibSup = 1.3;
 let lastDegree = 0;
+let lastDegreeBs = 0;
 let busy = false;
 let bUpdateXyz = true;
 
 async function pointsFilter(degreePF, distance) {
-  let indexAngle = parseInt(degreePF / 100);
+  let indexDegree = parseInt(degreePF / 100);
   let indexDistance = parseInt(distance);
+  let execBufferSize = false;
   // console.log('pointsFilter at:  ', new Date())
 
-  // msrValues["last360"][indexAngle] =
-  //   msrValues["last360"][indexAngle] || [];
+  // msrValues["last360"][indexDegree] =
+  //   msrValues["last360"][indexDegree] || [];
 
-  indexDistance > 0 ? (msrValues["last360"][indexAngle] = indexDistance) : "";
+  indexDistance > 0 ? (msrValues["last360"][indexDegree] = indexDistance) : "";
 
   if (lastDegree > degreePF && busy === false) {
+    // console.log("Starting pointsFilter at: ", new Date());
+    msrValues["soft"] = {};
     busy = true;
-    counter++
+    counter++;
     Object.keys(msrValues["last360"]).forEach(async (degree) => {
       const distance360 = msrValues["last360"][degree];
 
@@ -681,7 +686,7 @@ async function pointsFilter(degreePF, distance) {
         ) {
           msrValues["soft"][degree] = distance360;
         } else {
-          msrValues["soft"][degree] = (distance360 + ((res[0]+res[1]+res[2])/3)) / 2;
+          //msrValues["soft"][degree] = (distance360 + ((res[0]+res[1]+res[2])/3)) / 2;
         }
 
         msrValues["reliabity"][degree] =
@@ -690,15 +695,21 @@ async function pointsFilter(degreePF, distance) {
     });
 
     lastDegree = degreePF;
-    bufferSize();
+    execBufferSize = true;
+    // bufferSize();
   } else {
     lastDegree = degreePF;
   }
 
   async function verifyNeiborhood(degreeRec) {
+    // console.log(degreeRec, 'Starting verifyNeiborhood at: ', new Date())
     //console.log('verifyNeiborhood at:  ', new Date())
-    const neibBefore = parseInt(parseInt(degreeRec) - parseInt(qtyNeiborhoodVerify));
-    const neibAfter = parseInt(parseInt(degreeRec) + parseInt(qtyNeiborhoodVerify));
+    const neibBefore = parseInt(
+      parseInt(degreeRec) - parseInt(qtyNeiborhoodVerify)
+    );
+    const neibAfter = parseInt(
+      parseInt(degreeRec) + parseInt(qtyNeiborhoodVerify)
+    );
     const neibBetweenBef = parseInt(
       degreeRec - Math.ceil(qtyNeiborhoodVerify / 2)
     );
@@ -729,6 +740,7 @@ async function pointsFilter(degreePF, distance) {
   }
 
   async function avgNeiborhood(before, after, between) {
+    // console.log('Starting avgNeiborhood at: ', new Date())
     //console.log('avgNeiborhood at:  ', new Date())
     return [
       before.reduce((acc, current) => {
@@ -743,47 +755,54 @@ async function pointsFilter(degreePF, distance) {
     ];
   }
 
-  return
+  return execBufferSize === true? (bufferSize(), execBufferSize = false ) : '';
 }
 
 async function bufferSize() {
+  // console.log("Starting bufferSize at: ", new Date());
   try {
     Object.keys(msrValues["soft"]).forEach(async (degree) => {
-      msrValues["lastValues"][degree] = msrValues["lastValues"][degree]  || []
+      msrValues["lastValues"][degree] = msrValues["lastValues"][degree] || [];
       msrValues["lastValues"][degree].push(msrValues["soft"][degree]);
       if (msrValues["lastValues"][degree].length >= qtyMsgAvgCalc) {
-        // let average = await dataServices.averageCalcSemOutliers(
-        //   msrValues["lastValues"][degree],
-        //   tol,
-        //   dataServices.averageCalc,
-        //   dataServices.calcStdDeviation,
-        //   wheight
-        // );
-        // average > 0 ? (msrValues["avgValues"][degree] = average) : "";
-  
+        let average = await dataServices.averageCalcSemOutliers(
+          msrValues["lastValues"][degree],
+          tol,
+          dataServices.averageCalc,
+          dataServices.calcStdDeviation,
+          0
+        );
+        average > 0 ? (msrValues["avgValues"][degree] = average) : "";
+
         msrValues["lastValues"][degree].shift();
       }
     });
   } catch (e) {
-    console.log('Falha ao executar BufferSize: ',e)
+    console.log("Falha ao executar BufferSize: ", e);
   }
 
-  return setTimeout(()=>busy=false, 80) //console.log(Object.keys(msrValues['soft']).length, 'endBufferSize at:  ', new Date()) //console.log('Fim do bufferSize at: ', new Date())
+  return setTimeout(() => (busy = false), 150); //console.log(Object.keys(msrValues['soft']).length, 'endBufferSize at:  ', new Date()) //console.log('Fim do bufferSize at: ', new Date())
 }
 
 async function updateXYZ() {
-  console.log("updating")
-  if (bUpdateXyz === false) {return};
+  // console.log('Starting updateXYZ at: ', new Date())
+  if (bUpdateXyz === false) {
+    return;
+  }
   let source = "soft";
+  if (Object.keys(msrValues['avgValues']).length > 10) {
+    source = "avgValues"
+  }
   // Object.keys(msrValues["soft"]).length > 10
   //   ? (source = "soft")
   //   : (source = "avgValues");
   if (msrValues[source] !== undefined) {
     if (Object.keys(msrValues[source]).length > 0) {
+      console.log(source,'Valores recebidos: ', msrValues[source])
       msrValues["xyz"] = [];
       pointsCoordinates = [];
       Object.keys(msrValues[source]).forEach(async (degree) => {
-        if (msrValues[source][degree] > 0 && degree % 3 === 0) {
+        if (msrValues[source][degree] > 0) {
           await dataServices
             .lidarToXYZ(degree, msrValues[source][degree], 0)
             .then((res) => {
@@ -801,7 +820,7 @@ async function updateXYZ() {
   return (pointsCoordinates = msrValues["xyz"]);
 }
 
-setInterval(updateXYZ, 2000);
+setInterval(updateXYZ, 400);
 
 async function updateZaxis() {
   const newValues = { ...msrValues["avgValues"] };
@@ -810,8 +829,12 @@ async function updateZaxis() {
 }
 
 function updateDegreeMov() {
-  const newValues = { ...msrValues["soft"] };
-  console.log("Valores a gravar: ", msrValues['soft'])
+  console.log(msrValues);
+  const newValues = { soft: {}, lastValues: {}, accelerometer: {} };
+  newValues.soft = { ...msrValues["soft"] };
+  newValues.lastValues = { ...msrValues["lastValues"] };
+  newValues.accelerometer = { ...accelerometer };
+  console.log("Valores a gravar: ", msrValues["soft"]);
   return (msrValues["degreeMov"][rotation360] = newValues);
 }
 
@@ -836,24 +859,25 @@ async function bufferReceive(data) {
 
   // Check all angles received
   for (let index = 0; index <= qtyAngles; index++) {
-    let indexAngle = initAngle + index * incAngle;
+    let indexDegree = initAngle + index * incAngle;
     let distIndex = parseInt(
       dataServices.bytesGroup(data, 7 + index * 3, 8 + index * 3)
     );
 
-    if (indexAngle / 100 < 360) {
-      await pointsFilter(indexAngle, distIndex);
+    if (indexDegree / 100 < 360) {
+      await pointsFilter(indexDegree, distIndex);
     }
   }
 
-  return bUpdateXyz=true;
+  return (bUpdateXyz = true);
 }
 
 const xyzGenerate = async () => {
+  // console.log('Starting syzGenerate at: ', new Date())
   msrValues["xyz"] = [];
   pointsCoordinates = [];
 
-  console.log("Starting the XYZ generate: ", msrValues["degreeMov"])
+  // console.log("Starting the XYZ generate: ", msrValues["degreeMov"])
 
   return new Promise((resolve, reject) => {
     if (msrValues["zReg"] && false) {
@@ -869,41 +893,43 @@ const xyzGenerate = async () => {
         });
       });
     } else if (msrValues["degreeMov"]) {
-      Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
-          Object.keys(msrValues["degreeMov"][degreeMag]).forEach(
-            async (degreeLidar) => {
-              resolve(
-                await dataServices
-                  .lidarToXYZ(
-                    degreeLidar,
-                    msrValues["degreeMov"][degreeMag][degreeLidar],
-                    0
-                  )
-                  .then(async (res) => {
-                    await dataServices
-                      .lidarToXYZ(degreeMag, res.x, 0)
-                      .then((res2) => {
-                        return msrValues["xyz"].push({
-                          x: res2.y,
-                          y: res.y,
-                          z: res2.x,
-                        });
+      // console.log(msrValues.degreeMov)
+      Object.keys(msrValues["degreeMov"]["soft"]).forEach(async (degreeMag) => {
+        Object.keys(msrValues["degreeMov"]["soft"][degreeMag]).forEach(
+          async (degreeLidar) => {
+            resolve(
+              await dataServices
+                .lidarToXYZ(
+                  degreeLidar,
+                  msrValues["degreeMov"]["soft"][degreeMag][degreeLidar],
+                  0
+                )
+                .then(async (res) => {
+                  await dataServices
+                    .lidarToXYZ(degreeMag, res.x, 0)
+                    .then((res2) => {
+                      return msrValues["xyz"].push({
+                        x: res2.y,
+                        y: res.y,
+                        z: res2.x,
                       });
-                  })
-                  .catch((err) => console.log(err))
-              );
-            }
-          );
+                    });
+                })
+                .catch((err) => console.log(err))
+            );
+          }
+        );
       });
     }
-
   });
 };
 
 function compile() {
   xyzGenerate().then(async () => {
-    return (console.log('Compilando...', msrValues['xyz']),
-    (pointsCoordinates = msrValues["xyz"]),
-      dataServices.shareFile(await dataServices.colladaSave(msrValues["xyz"])));
+    return (
+      console.log("Compilando...", msrValues["xyz"]),
+      (pointsCoordinates = msrValues["xyz"]),
+      dataServices.shareFile(await dataServices.colladaSave(msrValues["xyz"]))
+    );
   });
 }
