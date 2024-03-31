@@ -639,17 +639,17 @@ let msrValues = {
   soft: {},
   reliabity: {},
 };
-const tol = 0;
+const tol = 1;
 const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
-const qtyMsgAvgCalc = 4; // Quantity of measures to calculate the average
+const qtyMsgAvgCalc = 3; // Quantity of measures to calculate the average
 const qtyNeiborhoodVerify = 5;
 //36 ms = 5cm
 let measureStarted;
 let zAxis = 0;
 let counter = 0;
 const incrZ = 50;
-const percNeibInf = 0.7;
-const percNeibSup = 1.3;
+const percNeibInf = 0.95;
+const percNeibSup = 1.05;
 let lastDegree = 0;
 let lastDegreeBs = 0;
 let busy = false;
@@ -668,13 +668,16 @@ async function pointsFilter(degreePF, distance) {
 
   if (lastDegree > degreePF && busy === false) {
     // console.log("Starting pointsFilter at: ", new Date());
-    msrValues["soft"] = {};
+    // msrValues["soft"] = {};
     busy = true;
     counter++;
-    Object.keys(msrValues["last360"]).forEach(async (degree) => {
-      const distance360 = msrValues["last360"][degree];
 
-      await verifyNeiborhood(degree, distance360).then((res) => {
+    let softTemp = {};
+
+    async function writingSoft() {
+      const promises = Object.keys(msrValues["last360"]).map(async (degree) => {
+        const distance360 = msrValues["last360"][degree];
+        const res = await verifyNeiborhood(degree, distance360);
         if (
           (distance360 >= res[0] * percNeibInf &&
             distance360 <= res[0] * percNeibSup) ||
@@ -684,15 +687,23 @@ async function pointsFilter(degreePF, distance) {
             distance360 <= res[2] * percNeibSup) ||
           false //(res[0] === isNaN && res[1] === isNaN && res[2] === isNaN)
         ) {
-          msrValues["soft"][degree] = distance360;
+          softTemp[degree] = distance360;
         } else {
-          //msrValues["soft"][degree] = (distance360 + ((res[0]+res[1]+res[2])/3)) / 2;
+          msrValues["soft"][degree] = ((res[0]+res[1]+res[2])/3);
         }
-
+    
         msrValues["reliabity"][degree] =
-          100 * (msrValues["soft"][degree] / msrValues["last360"][degree]);
+          100 * (softTemp[degree] / msrValues["last360"][degree]);
       });
+    
+      await Promise.all(promises);
+    }
+    
+    writingSoft().then(() => {
+      msrValues["soft"] = softTemp;
+      bufferSize(softTemp);
     });
+    
 
     lastDegree = degreePF;
     execBufferSize = true;
@@ -755,13 +766,18 @@ async function pointsFilter(degreePF, distance) {
     ];
   }
 
-  return execBufferSize === true? (bufferSize(), execBufferSize = false ) : '';
+  // return execBufferSize === true
+  //   ? (bufferSize(msrValues["soft"]), (execBufferSize = false))
+  //   : "";
 }
 
-async function bufferSize() {
+// setInterval(console.log('valores médios', msrValues['avgValues']), 2000);
+
+async function bufferSize(data) {
   // console.log("Starting bufferSize at: ", new Date());
+  // console.log("soft: ", data);
   try {
-    Object.keys(msrValues["soft"]).forEach(async (degree) => {
+    Object.keys(data).forEach(async (degree) => {
       msrValues["lastValues"][degree] = msrValues["lastValues"][degree] || [];
       msrValues["lastValues"][degree].push(msrValues["soft"][degree]);
       if (msrValues["lastValues"][degree].length >= qtyMsgAvgCalc) {
@@ -790,15 +806,15 @@ async function updateXYZ() {
     return;
   }
   let source = "soft";
-  if (Object.keys(msrValues['avgValues']).length > 10) {
-    source = "avgValues"
+  if (Object.keys(msrValues["avgValues"]).length > 10) {
+    source = "avgValues";
   }
   // Object.keys(msrValues["soft"]).length > 10
   //   ? (source = "soft")
   //   : (source = "avgValues");
   if (msrValues[source] !== undefined) {
     if (Object.keys(msrValues[source]).length > 0) {
-      console.log(source,'Valores recebidos: ', msrValues[source])
+      // console.log(source, "Valores recebidos: ", msrValues[source]);
       msrValues["xyz"] = [];
       pointsCoordinates = [];
       Object.keys(msrValues[source]).forEach(async (degree) => {
