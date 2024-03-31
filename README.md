@@ -31,6 +31,7 @@ Usar:
 
 
 ## Pendências
+- Verificar estabilizaçao da leitura para disparo
 - Melhorar suavização dos pontos (eliminar ruídos)
    - detectar retas ou tendências
    - detectar pontos fora das retas ou tendências
@@ -41,3 +42,5 @@ Usar:
 - Tela para cálculos de sacos
 - 
 
+
+- Corrigir giro do sensor pelo eixo Y (tela pra cima) ou X (tela para frente)

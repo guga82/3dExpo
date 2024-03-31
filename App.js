@@ -41,6 +41,7 @@ export default function App() {
   let magnetRot = { x: 0, y: 0, z: 0 };
   let accelerometerAvg = { x: 0, y: 0, z: 0 };
   let timeout;
+  // const [readStable, setReadStable] = useState(0);
   // const [{ x, y, z }, setData] = useState({
   //   x: 0,
   //   y: 0,
@@ -544,6 +545,7 @@ export default function App() {
       {/* <Text>Pressure: {averagePressure} hPa</Text> */}
       {/* </View> */}
       <View style={styles.buttonContainer}>
+        {/* <Text style={styles.text}>Estabilidade: {readStable}</Text> */}
         {/* <Text style={styles.text}>Magnetometer:</Text>
       <Text style={styles.text}>x: {x.toFixed(1)}</Text>
       <Text style={styles.text}>y: {y.toFixed(1)}</Text>
@@ -637,7 +639,8 @@ let msrValues = {
   zReg: {},
   degreeMov: {},
   soft: {},
-  reliabity: {},
+  reliability: {},
+  highFilter: {}
 };
 const tol = 1;
 const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
@@ -692,16 +695,20 @@ async function pointsFilter(degreePF, distance) {
           msrValues["soft"][degree] = ((res[0]+res[1]+res[2])/3);
         }
     
-        msrValues["reliabity"][degree] =
-          100 * (softTemp[degree] / msrValues["last360"][degree]);
       });
     
       await Promise.all(promises);
     }
     
-    writingSoft().then(() => {
+    writingSoft().then(async () => {
       msrValues["soft"] = softTemp;
       bufferSize(softTemp);
+      //console.log("Confiabilidade: ", Object.values(msrValues["reliability"]).sort((a,b)=>b-a))
+      // console.log(await mediaTest())
+      // console.log(msrValues.highFilter)
+      async function mediaTest(){
+        return await dataServices.averageCalcSemOutliers(Object.values(msrValues["reliability"]),0,dataServices.averageCalc,dataServices.calcStdDeviation,0 )
+      }
     });
     
 
@@ -786,9 +793,17 @@ async function bufferSize(data) {
           tol,
           dataServices.averageCalc,
           dataServices.calcStdDeviation,
-          0
+          500
         );
         average > 0 ? (msrValues["avgValues"][degree] = average) : "";
+
+        const reliability = 100 * (1 - Math.abs(average < msrValues["soft"][degree] ? average / msrValues["soft"][degree] : msrValues["soft"][degree] / average))
+
+        reliability >0 && reliability !== Infinity? msrValues["reliability"][degree] = parseInt(reliability) : ''
+
+        if (reliability > 20) {
+          msrValues['highFilter'][degree] = msrValues["soft"][degree]
+        }
 
         msrValues["lastValues"][degree].shift();
       }
@@ -797,7 +812,7 @@ async function bufferSize(data) {
     console.log("Falha ao executar BufferSize: ", e);
   }
 
-  return setTimeout(() => (busy = false), 150); //console.log(Object.keys(msrValues['soft']).length, 'endBufferSize at:  ', new Date()) //console.log('Fim do bufferSize at: ', new Date())
+  return setTimeout(() => (busy = false), 100); //console.log(Object.keys(msrValues['soft']).length, 'endBufferSize at:  ', new Date()) //console.log('Fim do bufferSize at: ', new Date())
 }
 
 async function updateXYZ() {
@@ -806,15 +821,15 @@ async function updateXYZ() {
     return;
   }
   let source = "soft";
-  if (Object.keys(msrValues["avgValues"]).length > 10) {
-    source = "avgValues";
+  if (Object.keys(msrValues["highFilter"]).length > 10) {
+    source = "highFilter";
   }
   // Object.keys(msrValues["soft"]).length > 10
   //   ? (source = "soft")
   //   : (source = "avgValues");
   if (msrValues[source] !== undefined) {
     if (Object.keys(msrValues[source]).length > 0) {
-      // console.log(source, "Valores recebidos: ", msrValues[source]);
+      console.log(source, "Valores recebidos: ", msrValues[source]);
       msrValues["xyz"] = [];
       pointsCoordinates = [];
       Object.keys(msrValues[source]).forEach(async (degree) => {

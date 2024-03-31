@@ -96,8 +96,11 @@ class DataServices {
       return 0;
     }
 
+    const dataLength = data.length
     let average = await data.reduce((acc, value, index) => {
-      const peso = 100 + (weight2 * index)
+      let invIndex = dataLength-index
+      
+      const peso = 100 + (weight2 * invIndex)
       acc["soma"] = acc["soma"] || 0
       acc["weight"] = acc["weight"] || 0
       acc["soma"] += parseInt(value) * peso;
