@@ -640,7 +640,7 @@ let msrValues = {
   degreeMov: {},
   soft: {},
   reliability: {},
-  highFilter: {}
+  highFilter: {},
 };
 const tol = 1;
 const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
@@ -692,25 +692,29 @@ async function pointsFilter(degreePF, distance) {
         ) {
           softTemp[degree] = distance360;
         } else {
-          msrValues["soft"][degree] = ((res[0]+res[1]+res[2])/3);
+          msrValues["soft"][degree] = (res[0] + res[1] + res[2]) / 3;
         }
-    
       });
-    
+
       await Promise.all(promises);
     }
-    
+
     writingSoft().then(async () => {
       msrValues["soft"] = softTemp;
       bufferSize(softTemp);
       //console.log("Confiabilidade: ", Object.values(msrValues["reliability"]).sort((a,b)=>b-a))
       // console.log(await mediaTest())
       // console.log(msrValues.highFilter)
-      async function mediaTest(){
-        return await dataServices.averageCalcSemOutliers(Object.values(msrValues["reliability"]),0,dataServices.averageCalc,dataServices.calcStdDeviation,0 )
+      async function mediaTest() {
+        return await dataServices.averageCalcSemOutliers(
+          Object.values(msrValues["reliability"]),
+          0,
+          dataServices.averageCalc,
+          dataServices.calcStdDeviation,
+          0
+        );
       }
     });
-    
 
     lastDegree = degreePF;
     execBufferSize = true;
@@ -797,12 +801,21 @@ async function bufferSize(data) {
         );
         average > 0 ? (msrValues["avgValues"][degree] = average) : "";
 
-        const reliability = 100 * (1 - Math.abs(average < msrValues["soft"][degree] ? average / msrValues["soft"][degree] : msrValues["soft"][degree] / average))
+        const reliability =
+          100 *
+          (1 -
+            Math.abs(
+              average < msrValues["soft"][degree]
+                ? average / msrValues["soft"][degree]
+                : msrValues["soft"][degree] / average
+            ));
 
-        reliability >0 && reliability !== Infinity? msrValues["reliability"][degree] = parseInt(reliability) : ''
+        reliability > 0 && reliability !== Infinity
+          ? (msrValues["reliability"][degree] = parseInt(reliability))
+          : "";
 
-        if (reliability > 20) {
-          msrValues['highFilter'][degree] = msrValues["soft"][degree]
+        if (reliability > 50) {
+          msrValues["highFilter"][degree] = msrValues["soft"][degree];
         }
 
         msrValues["lastValues"][degree].shift();
@@ -820,16 +833,16 @@ async function updateXYZ() {
   if (bUpdateXyz === false) {
     return;
   }
-  let source = "soft";
+  let source = "last360";
   if (Object.keys(msrValues["highFilter"]).length > 10) {
-    source = "highFilter";
+    source = "last360";
   }
   // Object.keys(msrValues["soft"]).length > 10
   //   ? (source = "soft")
   //   : (source = "avgValues");
   if (msrValues[source] !== undefined) {
     if (Object.keys(msrValues[source]).length > 0) {
-      console.log(source, "Valores recebidos: ", msrValues[source]);
+      // console.log(source, "Valores recebidos: ", msrValues[source]);
       msrValues["xyz"] = [];
       pointsCoordinates = [];
       Object.keys(msrValues[source]).forEach(async (degree) => {
@@ -863,7 +876,9 @@ function updateDegreeMov() {
   console.log(msrValues);
   const newValues = { soft: {}, lastValues: {}, accelerometer: {} };
   newValues.soft = { ...msrValues["soft"] };
+  newValues.highFilter = { ...msrValues["highFilter"] };
   newValues.lastValues = { ...msrValues["lastValues"] };
+  newValues.last360 = { ...msrValues["last360"] };
   newValues.accelerometer = { ...accelerometer };
   console.log("Valores a gravar: ", msrValues["soft"]);
   return (msrValues["degreeMov"][rotation360] = newValues);
@@ -871,8 +886,9 @@ function updateDegreeMov() {
 
 async function bufferReceive(data) {
   let byteSize = parseInt(data[2], 16);
+  let byteSizeReal = data.length
 
-  if (byteSize !== 58) {
+  if (byteSize !== 58 || byteSizeReal !== 58) {
     return;
   }
 
@@ -889,7 +905,7 @@ async function bufferReceive(data) {
   }
 
   // Check all angles received
-  for (let index = 0; index <= qtyAngles; index++) {
+  for (let index = 0; index <= qtyAngles-1; index++) {
     let indexDegree = initAngle + index * incAngle;
     let distIndex = parseInt(
       dataServices.bytesGroup(data, 7 + index * 3, 8 + index * 3)
@@ -924,15 +940,39 @@ const xyzGenerate = async () => {
         });
       });
     } else if (msrValues["degreeMov"]) {
-      // console.log(msrValues.degreeMov)
-      Object.keys(msrValues["degreeMov"]["soft"]).forEach(async (degreeMag) => {
-        Object.keys(msrValues["degreeMov"]["soft"][degreeMag]).forEach(
+      // console.log(msrValues.degreeMov);
+      // Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag, indexMag) => {
+      //   Object.keys(msrValues["degreeMov"][degreeMag]["last360"]).forEach(
+      //     async (degreeLidar) => {
+      //       resolve(
+      //         await dataServices
+      //           .lidarToXYZ(
+      //             degreeLidar,
+      //             msrValues["degreeMov"][degreeMag]["last360"][degreeLidar],
+      //             0
+      //           )
+      //           .then(async (res) => {
+      //             return msrValues["xyz"].push({
+      //               x: res.x,
+      //               y: res.y,
+      //               z: indexMag * 800,
+      //             });
+      //           })
+      //           .catch((err) => console.log(err))
+      //       );
+      //     }
+      //   );
+      // });
+
+      console.log(msrValues.degreeMov);
+      Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
+        Object.keys(msrValues["degreeMov"][degreeMag]["last360"]).forEach(
           async (degreeLidar) => {
             resolve(
               await dataServices
                 .lidarToXYZ(
                   degreeLidar,
-                  msrValues["degreeMov"]["soft"][degreeMag][degreeLidar],
+                  msrValues["degreeMov"][degreeMag]["last360"][degreeLidar],
                   0
                 )
                 .then(async (res) => {
