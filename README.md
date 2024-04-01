@@ -28,6 +28,7 @@ Usar:
 ## Versões
 1.0.0 - Versão inicial -> Leitura dos sensores do acelerômetro do smartphone
 1.0.1 - Filtro para leitura do sensor Lidar
+1.0.2 - Giro para captar leitura 3D
 
 
 ## Pendências

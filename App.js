@@ -977,11 +977,11 @@ const xyzGenerate = async () => {
                 )
                 .then(async (res) => {
                   await dataServices
-                    .lidarToXYZ(degreeMag, res.x, 0)
+                    .lidarToXYZ(degreeMag, res.y, 0)
                     .then((res2) => {
                       return msrValues["xyz"].push({
-                        x: res2.y,
-                        y: res.y,
+                        x: res.x,
+                        y: res2.y,
                         z: res2.x,
                       });
                     });
