@@ -877,6 +877,7 @@ function updateDegreeMov() {
   const newValues = { soft: {}, lastValues: {}, accelerometer: {} };
   newValues.soft = { ...msrValues["soft"] };
   newValues.highFilter = { ...msrValues["highFilter"] };
+  newValues.avgValues = { ...msrValues["avgValues"] };
   newValues.lastValues = { ...msrValues["lastValues"] };
   newValues.last360 = { ...msrValues["last360"] };
   newValues.accelerometer = { ...accelerometer };
@@ -886,7 +887,7 @@ function updateDegreeMov() {
 
 async function bufferReceive(data) {
   let byteSize = parseInt(data[2], 16);
-  let byteSizeReal = data.length
+  let byteSizeReal = data.length;
 
   if (byteSize !== 58 || byteSizeReal !== 58) {
     return;
@@ -905,7 +906,7 @@ async function bufferReceive(data) {
   }
 
   // Check all angles received
-  for (let index = 0; index <= qtyAngles-1; index++) {
+  for (let index = 0; index <= qtyAngles - 1; index++) {
     let indexDegree = initAngle + index * incAngle;
     let distIndex = parseInt(
       dataServices.bytesGroup(data, 7 + index * 3, 8 + index * 3)
@@ -966,28 +967,30 @@ const xyzGenerate = async () => {
 
       console.log(msrValues.degreeMov);
       Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
-        Object.keys(msrValues["degreeMov"][degreeMag]["last360"]).forEach(
+        Object.keys(msrValues["degreeMov"][degreeMag]["soft"]).forEach(
           async (degreeLidar) => {
-            resolve(
-              await dataServices
-                .lidarToXYZ(
-                  degreeLidar,
-                  msrValues["degreeMov"][degreeMag]["last360"][degreeLidar],
-                  0
-                )
-                .then(async (res) => {
-                  await dataServices
-                    .lidarToXYZ(degreeMag, res.y, 0)
-                    .then((res2) => {
-                      return msrValues["xyz"].push({
-                        x: res.x,
-                        y: res2.y,
-                        z: res2.x,
+            if (degreeLidar % 10 === 0) {
+              resolve(
+                await dataServices
+                  .lidarToXYZ(
+                    degreeLidar,
+                    msrValues["degreeMov"][degreeMag]["soft"][degreeLidar],
+                    0
+                  )
+                  .then(async (res) => {
+                    await dataServices
+                      .lidarToXYZ(degreeMag, res.y, 0)
+                      .then((res2) => {
+                        return msrValues["xyz"].push({
+                          x: res.x,
+                          y: res2.y,
+                          z: res2.x,
+                        });
                       });
-                    });
-                })
-                .catch((err) => console.log(err))
-            );
+                  })
+                  .catch((err) => console.log(err))
+              );
+            }
           }
         );
       });

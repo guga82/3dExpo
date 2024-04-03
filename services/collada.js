@@ -57,6 +57,8 @@ module.exports = async function (coordinates) {
     return xml;
   }
 
+  const pointSize = 8;
+  
   // Função para gerar os índices das linhas
   async function generateIndices(positionsCount) {
     const indices = [];
@@ -71,14 +73,17 @@ module.exports = async function (coordinates) {
 
   try {
     positions = coordinates.reduce((acc, cur, index) => {
-        if (index > 1) {
-          acc.push(coordinates[index - 1].x);
-          acc.push(coordinates[index - 1].y);
-          acc.push(coordinates[index - 1].z);
-        }
+        // if (index > 1) {
+        //   acc.push(coordinates[index - 1].x);
+        //   acc.push(coordinates[index - 1].y);
+        //   acc.push(coordinates[index - 1].z);
+        // }
         acc.push(cur.x);
         acc.push(cur.y);
         acc.push(cur.z);
+        acc.push(cur.x+pointSize);
+        acc.push(cur.y+pointSize);
+        acc.push(cur.z+pointSize);
         return acc;
       }, []);
   } catch (err){
