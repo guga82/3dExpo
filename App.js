@@ -24,6 +24,7 @@ let rotZ;
 let rotation360;
 let bStartMeasure = false;
 let accelerometer;
+let degreeAngle = 0;
 // let magX = [];
 // let magY = [];
 // let magZ = [];
@@ -250,7 +251,9 @@ export default function App() {
       accelerometerSizeAverage
     );
 
-    return accelerometerUpdate();
+    return accelerometerUpdate().then(
+      rotAngleCalcule(accelerometer.x, accelerometer.y)
+    );
   });
 
   async function accelerometerUpdate() {
@@ -282,6 +285,27 @@ export default function App() {
       )
     );
     return (accelerometer = accelerometerAvg);
+  }
+
+  // Função para calcular o ângulo de rotação
+  function rotAngleCalcule(x, y) {
+    // Calcular o ângulo usando a função atan2
+    // A ordem dos argumentos em atan2 é (y, x) ao contrário do usual (x, y)
+    // Isso é necessário para garantir que o ângulo seja calculado corretamente no intervalo de -π a π
+
+    if (x !== undefined && y !== undefined) {
+      let radDegree = Math.atan2(y, x);
+
+      // Converter o ângulo de radianos para graus
+      degreeAngle = radDegree * (180 / Math.PI);
+
+      // Garantir que o ângulo esteja dentro do intervalo de 0 a 360 graus
+      if (degreeAngle > 180) {
+        degreeAngle -= 360;
+      }
+
+      return;
+    }
   }
 
   // Barometer.setUpdateInterval(50);
@@ -647,7 +671,7 @@ const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
 const qtyMsgAvgCalc = 3; // Quantity of measures to calculate the average
 const qtyNeiborhoodVerify = 5;
 //36 ms = 5cm
-let measureStarted;
+const minDistance = 500; // Shortest distance to measure (filter human presence or other objects)
 let zAxis = 0;
 let counter = 0;
 const incrZ = 50;
@@ -667,7 +691,9 @@ async function pointsFilter(degreePF, distance) {
   // msrValues["last360"][indexDegree] =
   //   msrValues["last360"][indexDegree] || [];
 
-  indexDistance > 0 ? (msrValues["last360"][indexDegree] = indexDistance) : "";
+  indexDistance > minDistance
+    ? (msrValues["last360"][indexDegree] = indexDistance)
+    : "";
 
   if (lastDegree > degreePF && busy === false) {
     // console.log("Starting pointsFilter at: ", new Date());
@@ -881,6 +907,7 @@ function updateDegreeMov() {
   newValues.lastValues = { ...msrValues["lastValues"] };
   newValues.last360 = { ...msrValues["last360"] };
   newValues.accelerometer = { ...accelerometer };
+  newValues.actRotAngle = degreeAngle;
   console.log("Valores a gravar: ", msrValues["soft"]);
   return (msrValues["degreeMov"][rotation360] = newValues);
 }
@@ -967,6 +994,7 @@ const xyzGenerate = async () => {
 
       console.log(msrValues.degreeMov);
       Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
+        const actDegreeAngle = msrValues["actRotAngle"]
         Object.keys(msrValues["degreeMov"][degreeMag]["soft"]).forEach(
           async (degreeLidar) => {
             if (degreeLidar % 10 === 0) {
@@ -974,7 +1002,7 @@ const xyzGenerate = async () => {
                 await dataServices
                   .lidarToXYZ(
                     degreeLidar,
-                    msrValues["degreeMov"][degreeMag]["soft"][degreeLidar],
+                    msrValues["degreeMov"][degreeMag]["soft"][degreeLidar] + actDegreeAngle,
                     0
                   )
                   .then(async (res) => {
