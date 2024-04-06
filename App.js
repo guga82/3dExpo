@@ -251,7 +251,7 @@ export default function App() {
       accelerometerSizeAverage
     );
 
-    return accelerometerUpdate().then(([x,y]) => {
+    return accelerometerUpdate().then(([x, y]) => {
       rotAngleCalcule(x, y);
     });
   });
@@ -284,12 +284,12 @@ export default function App() {
         0
       )
     );
-    return ([accelerometerAvg.x, accelerometerAvg.y]);
+    return [accelerometerAvg.x, accelerometerAvg.y];
   }
 
   // Função para calcular o ângulo de rotação
   function rotAngleCalcule(x, y) {
-    let degreeCalc = degreeAccelX
+    let degreeCalc = degreeAccelX;
     if (x !== undefined && y !== undefined) {
       let radDegree = Math.atan2(y, x);
 
@@ -299,7 +299,7 @@ export default function App() {
         degreeCalc -= 360;
       }
     }
-    return degreeAccelX = parseInt(degreeCalc*-1)
+    return (degreeAccelX = parseInt(degreeCalc * -1));
   }
 
   // Barometer.setUpdateInterval(50);
@@ -649,6 +649,7 @@ export default function App() {
 let msrValues = {
   lastValues: {},
   last360: {},
+  cnt360update: {},
   avgValues: {},
   stdDeviation: {},
   xyz: [],
@@ -665,7 +666,7 @@ const elQtyMovDetect = -4; // Quantity of elements of array to average the moves
 const qtyMsgAvgCalc = 3; // Quantity of measures to calculate the average
 const qtyNeiborhoodVerify = 5;
 //36 ms = 5cm
-const minDistance = 500; // Shortest distance to measure (filter human presence or other objects)
+let measureStarted;
 let zAxis = 0;
 let counter = 0;
 const incrZ = 50;
@@ -673,25 +674,32 @@ const percNeibInf = 0.95;
 const percNeibSup = 1.05;
 let lastDegree = 0;
 let lastDegreeBs = 0;
+let lastDegreeAcc = 0;
+let lastDegreeMag = 0;
 let busy = false;
 let bUpdateXyz = true;
+let maxWithoutUpdate = 3;
 
 async function pointsFilter(degreePF, distance) {
-  let indexDegree = parseInt((degreePF / 100))+parseInt(degreeAccelX);
+  let indexDegree = parseInt(degreePF / 100); //+ parseInt(degreeAccelX);
   let indexDistance = parseInt(distance);
   let execBufferSize = false;
-  // console.log('pointsFilter at:  ', new Date())
 
-  // msrValues["last360"][indexDegree] =
-  //   msrValues["last360"][indexDegree] || [];
+  if (indexDistance > 0) {
+    //Insert a new value at last360 register
+    msrValues["last360"][indexDegree] = indexDistance;
+    msrValues["cnt360update"][indexDegree] = 0;
+    maxWithoutUpdate;
+  } else {
+    msrValues["cnt360update"][indexDegree] += 1;
+    if (msrValues["cnt360update"][indexDegree] >= maxWithoutUpdate) {
+      //delete last360 by miss of update value
+      delete msrValues["last360"][indexDegree];
+      msrValues["cnt360update"][indexDegree] = 0;
+    }
+  }
 
-  indexDistance > minDistance
-    ? (msrValues["last360"][indexDegree] = indexDistance)
-    : "";
-
-  if (lastDegree > degreePF && busy === false) {
-    // console.log("Starting pointsFilter at: ", new Date());
-    // msrValues["soft"] = {};
+  if (lastDegree > indexDegree && busy === false) {
     busy = true;
     counter++;
 
@@ -721,7 +729,18 @@ async function pointsFilter(degreePF, distance) {
 
     writingSoft().then(async () => {
       msrValues["soft"] = softTemp;
-      bufferSize(softTemp);
+      bufferSize(softTemp).then(()=>{
+
+        // if (degreeAccelX !== lastDegreeAcc || lastDegreeMag !== rotation360) {
+        //   msrValues["last360"] = {};
+        //   msrValues["cnt360update"] = {};
+        // }
+        // lastDegreeAcc = degreeAccelX;
+        // lastDegreeMag = rotation360;
+
+      });
+
+
       //console.log("Confiabilidade: ", Object.values(msrValues["reliability"]).sort((a,b)=>b-a))
       // console.log(await mediaTest())
       // console.log(msrValues.highFilter)
@@ -736,11 +755,11 @@ async function pointsFilter(degreePF, distance) {
       }
     });
 
-    lastDegree = degreePF;
+    lastDegree = indexDegree;
     execBufferSize = true;
     // bufferSize();
   } else {
-    lastDegree = degreePF;
+    lastDegree = indexDegree;
   }
 
   async function verifyNeiborhood(degreeRec) {
@@ -810,7 +829,7 @@ async function bufferSize(data) {
   try {
     Object.keys(data).forEach(async (degree) => {
       msrValues["lastValues"][degree] = msrValues["lastValues"][degree] || [];
-      msrValues["lastValues"][degree].push(msrValues["last360"][degree]);
+      msrValues["lastValues"][degree].push(msrValues["soft"][degree]);
       if (msrValues["lastValues"][degree].length >= qtyMsgAvgCalc) {
         let average = await dataServices.averageCalcSemOutliers(
           msrValues["lastValues"][degree],
@@ -854,21 +873,16 @@ async function updateXYZ() {
     return;
   }
   let source = "last360";
-  if (Object.keys(msrValues["highFilter"]).length > 10) {
-    source = "last360";
-  }
-  // Object.keys(msrValues["soft"]).length > 10
-  //   ? (source = "soft")
-  //   : (source = "avgValues");
   if (msrValues[source] !== undefined) {
     if (Object.keys(msrValues[source]).length > 0) {
       // console.log(source, "Valores recebidos: ", msrValues[source]);
       msrValues["xyz"] = [];
       pointsCoordinates = [];
       Object.keys(msrValues[source]).forEach(async (degree) => {
+        const degreeCalcAcc = parseInt(degree) + parseInt(degreeAccelX);
         if (msrValues[source][degree] > 0) {
           await dataServices
-            .lidarToXYZ(parseInt(degree), msrValues[source][degree], 0)
+            .lidarToXYZ(degreeCalcAcc, msrValues[source][degree], 0)
             .then((res) => {
               return msrValues["xyz"].push({
                 x: res.x,
@@ -901,7 +915,7 @@ function updateDegreeMov() {
   newValues.lastValues = { ...msrValues["lastValues"] };
   newValues.last360 = { ...msrValues["last360"] };
   newValues.accelerometer = { ...accelerometer };
-  newValues.actRotAngle = degreeAccelX;
+  newValues.degreeAccelX = { ...degreeAccelX };
   console.log("Valores a gravar: ", msrValues["soft"]);
   return (msrValues["degreeMov"][rotation360] = newValues);
 }
@@ -988,17 +1002,14 @@ const xyzGenerate = async () => {
 
       console.log(msrValues.degreeMov);
       Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
-        const actDegreeAngle = msrValues["degreeMov"][degreeMag]["actRotAngle"];
-        Object.keys(msrValues["degreeMov"][degreeMag]["last360"]).forEach(
+        Object.keys(msrValues["degreeMov"][degreeMag]["soft"]).forEach(
           async (degreeLidar) => {
-            if (degreeLidar % 2 === 0) {
+            if (degreeLidar % 1 === 0) {
               resolve(
                 await dataServices
                   .lidarToXYZ(
-                    parseInt(degreeLidar),
-                    parseInt(
-                      msrValues["degreeMov"][degreeMag]["last360"][degreeLidar]
-                    ),
+                    degreeLidar,
+                    msrValues["degreeMov"][degreeMag]["soft"][degreeLidar],
                     0
                   )
                   .then(async (res) => {
