@@ -915,7 +915,7 @@ function updateDegreeMov() {
   newValues.lastValues = { ...msrValues["lastValues"] };
   newValues.last360 = { ...msrValues["last360"] };
   newValues.accelerometer = { ...accelerometer };
-  newValues.degreeAccelX = { ...degreeAccelX };
+  newValues.degreeAccelX = degreeAccelX;
   console.log("Valores a gravar: ", msrValues["soft"]);
   return (msrValues["degreeMov"][rotation360] = newValues);
 }
@@ -1004,11 +1004,13 @@ const xyzGenerate = async () => {
       Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
         Object.keys(msrValues["degreeMov"][degreeMag]["soft"]).forEach(
           async (degreeLidar) => {
-            if (degreeLidar % 1 === 0) {
+            const degreeAccelRot = msrValues["degreeMov"][degreeMag]["degreeAccelX"]
+            const degreeCalcAcc = parseInt(degreeLidar) + parseInt(degreeAccelRot);
+            if (degreeCalcAcc % 1 === 0) {
               resolve(
                 await dataServices
                   .lidarToXYZ(
-                    degreeLidar,
+                    degreeCalcAcc,
                     msrValues["degreeMov"][degreeMag]["soft"][degreeLidar],
                     0
                   )
