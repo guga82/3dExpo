@@ -24,7 +24,7 @@ let rotZ;
 let rotation360;
 let bStartMeasure = false;
 let accelerometer;
-let degreeAngle = 0;
+let degreeAccelX = 0;
 // let magX = [];
 // let magY = [];
 // let magZ = [];
@@ -251,9 +251,9 @@ export default function App() {
       accelerometerSizeAverage
     );
 
-    return accelerometerUpdate().then(
-      rotAngleCalcule(accelerometer.x, accelerometer.y)
-    );
+    return accelerometerUpdate().then(([x,y]) => {
+      rotAngleCalcule(x, y);
+    });
   });
 
   async function accelerometerUpdate() {
@@ -284,28 +284,22 @@ export default function App() {
         0
       )
     );
-    return (accelerometer = accelerometerAvg);
+    return ([accelerometerAvg.x, accelerometerAvg.y]);
   }
 
   // Função para calcular o ângulo de rotação
   function rotAngleCalcule(x, y) {
-    // Calcular o ângulo usando a função atan2
-    // A ordem dos argumentos em atan2 é (y, x) ao contrário do usual (x, y)
-    // Isso é necessário para garantir que o ângulo seja calculado corretamente no intervalo de -π a π
-
+    let degreeCalc = degreeAccelX
     if (x !== undefined && y !== undefined) {
       let radDegree = Math.atan2(y, x);
 
-      // Converter o ângulo de radianos para graus
-      degreeAngle = radDegree * (180 / Math.PI);
+      degreeCalc = radDegree * (180 / Math.PI);
 
-      // Garantir que o ângulo esteja dentro do intervalo de 0 a 360 graus
-      if (degreeAngle > 180) {
-        degreeAngle -= 360;
+      if (degreeCalc > 180) {
+        degreeCalc -= 360;
       }
-
-      return;
     }
+    return degreeAccelX = parseInt(degreeCalc*-1)
   }
 
   // Barometer.setUpdateInterval(50);
@@ -683,7 +677,7 @@ let busy = false;
 let bUpdateXyz = true;
 
 async function pointsFilter(degreePF, distance) {
-  let indexDegree = parseInt(degreePF / 100);
+  let indexDegree = parseInt((degreePF / 100))+parseInt(degreeAccelX);
   let indexDistance = parseInt(distance);
   let execBufferSize = false;
   // console.log('pointsFilter at:  ', new Date())
@@ -816,7 +810,7 @@ async function bufferSize(data) {
   try {
     Object.keys(data).forEach(async (degree) => {
       msrValues["lastValues"][degree] = msrValues["lastValues"][degree] || [];
-      msrValues["lastValues"][degree].push(msrValues["soft"][degree]);
+      msrValues["lastValues"][degree].push(msrValues["last360"][degree]);
       if (msrValues["lastValues"][degree].length >= qtyMsgAvgCalc) {
         let average = await dataServices.averageCalcSemOutliers(
           msrValues["lastValues"][degree],
@@ -874,7 +868,7 @@ async function updateXYZ() {
       Object.keys(msrValues[source]).forEach(async (degree) => {
         if (msrValues[source][degree] > 0) {
           await dataServices
-            .lidarToXYZ(degree, msrValues[source][degree], 0)
+            .lidarToXYZ(parseInt(degree), msrValues[source][degree], 0)
             .then((res) => {
               return msrValues["xyz"].push({
                 x: res.x,
@@ -907,7 +901,7 @@ function updateDegreeMov() {
   newValues.lastValues = { ...msrValues["lastValues"] };
   newValues.last360 = { ...msrValues["last360"] };
   newValues.accelerometer = { ...accelerometer };
-  newValues.actRotAngle = degreeAngle;
+  newValues.actRotAngle = degreeAccelX;
   console.log("Valores a gravar: ", msrValues["soft"]);
   return (msrValues["degreeMov"][rotation360] = newValues);
 }
@@ -994,15 +988,17 @@ const xyzGenerate = async () => {
 
       console.log(msrValues.degreeMov);
       Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
-        const actDegreeAngle = msrValues["actRotAngle"]
-        Object.keys(msrValues["degreeMov"][degreeMag]["soft"]).forEach(
+        const actDegreeAngle = msrValues["degreeMov"][degreeMag]["actRotAngle"];
+        Object.keys(msrValues["degreeMov"][degreeMag]["last360"]).forEach(
           async (degreeLidar) => {
-            if (degreeLidar % 10 === 0) {
+            if (degreeLidar % 2 === 0) {
               resolve(
                 await dataServices
                   .lidarToXYZ(
-                    degreeLidar,
-                    msrValues["degreeMov"][degreeMag]["soft"][degreeLidar] + actDegreeAngle,
+                    parseInt(degreeLidar),
+                    parseInt(
+                      msrValues["degreeMov"][degreeMag]["last360"][degreeLidar]
+                    ),
                     0
                   )
                   .then(async (res) => {
