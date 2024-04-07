@@ -91,24 +91,24 @@ class DataServices {
   }
 
   async averageCalc(data, weightRec) {
-    let weight2 = weightRec === undefined ? 0 : weightRec
+    let weight2 = weightRec === undefined ? 0 : weightRec;
     if (data[0] === undefined) {
       return 0;
     }
 
-    const dataLength = data.length
+    const dataLength = data.length;
     let average = await data.reduce((acc, value, index) => {
-      let invIndex = dataLength-index
-      
-      const peso = 100 + (weight2 * invIndex)
-      acc["soma"] = acc["soma"] || 0
-      acc["weight"] = acc["weight"] || 0
-      acc["soma"] += parseInt(value) * peso;
-      acc["weight"] += peso
-      return acc;
-    }, {})
+      let invIndex = dataLength - index;
 
-    return average.soma / average.weight
+      const peso = 100 + weight2 * invIndex;
+      acc["soma"] = acc["soma"] || 0;
+      acc["weight"] = acc["weight"] || 0;
+      acc["soma"] += parseInt(value) * peso;
+      acc["weight"] += peso;
+      return acc;
+    }, {});
+
+    return average.soma / average.weight;
   }
 
   async calcStdDeviation(data, media) {
@@ -158,6 +158,13 @@ class DataServices {
       message: fileToSend,
       url: receivedFilePath,
     });
+  }
+
+  async calculateOtherSide(hypotenuse, knowSide) {
+    const unknowSide = Math.sqrt(
+      Math.pow(hypotenuse, 2) - Math.pow(knowSide, 2)
+    );
+    return unknowSide;
   }
 }
 
