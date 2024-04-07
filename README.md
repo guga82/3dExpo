@@ -41,6 +41,7 @@ Usar:
 - Leitura de deslocamentos de altura e lateral
 - Leitura de deslocamento de angulos
 - Tela para cálculos de sacos
+- Comprar relé - logica para ligar e desligar o Lidar ou botão
 - 
 
 
@@ -50,4 +51,4 @@ Usar:
 ## Próximos passos
 - Calcular o perímetro total
 - Extrair o diâmetro/raio do silo
-
+- Criar uma tela para medição do diâmetro

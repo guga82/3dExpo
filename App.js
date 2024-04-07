@@ -169,7 +169,6 @@ export default function App() {
       } else {
         rotation360 = degrees;
       }
-
     } else if (Math.abs(accelerometerAvg.y) > 90) {
       // Ponta para cima
       let rad = Math.atan(magnetometerAvg.z / magnetometerAvg.x);
@@ -187,7 +186,6 @@ export default function App() {
       } else {
         rotation360 = degrees;
       }
-
     } else if (Math.abs(accelerometerAvg.z) > 90) {
       // Tela para cima
 
@@ -674,9 +672,7 @@ async function pointsFilter(degreePF, distance) {
 
     writingSoft().then(async () => {
       msrValues["soft"] = softTemp;
-      bufferSize(softTemp).then(()=>{
-      });
-
+      bufferSize(softTemp).then(() => {});
 
       async function mediaTest() {
         return await dataServices.averageCalcSemOutliers(
@@ -760,6 +756,40 @@ async function pointsFilter(degreePF, distance) {
 async function bufferSize(data) {
   // console.log("Starting bufferSize at: ", new Date());
   // console.log("soft: ", data);
+  const degreesRef = [88, 89, 90, 91, 92];
+  degreesRef.forEach((degreeCalc) => {
+    const oppositeDegree = dataServices.calculateOppositeAngle(degreeCalc);
+    try {
+      let anguloFaltante;
+      const distAtual =
+        msrValues["last360"][degreeCalc] + msrValues["last360"][oppositeDegree];
+
+        const resposta = calcularCoordenadasCircunferencia(350, msrValues["last360"][degreeCalc], msrValues["last360"][oppositeDegree], rotation360)
+
+        console.log('resposta sobre o xy: ', resposta)
+      // calcularLadoFaltante(175, distAtual / 2).then((res) => {
+      //   anguloFaltante = res;
+      //   const centerDist = msrValues["last360"][degreeCalc] / 2 - distAtual; //w
+      //   const angleRadians = (rotation360 * Math.PI) / 180.0;
+      //   const x2 = centerDist * Math.sin(angleRadians);
+      //   const y2 = centerDist * Math.cos(angleRadians);
+      //   const oppositeDegree = 90 - rotation360;
+      //   const radOppDegree = (oppositeDegree * Math.PI) / 180.0;
+      //   const x1 = centerDist * Math.sin(radOppDegree);
+      //   const y1 = centerDist * Math.cos(radOppDegree);
+      //   const x = x1 + x2
+      //   const y = y2 - y1
+
+      //   console.log(
+      //     `Angulo ${degreeCalc}: ${distAtual} - distancia do centro: ${parseInt(anguloFaltante)} - x/y: ${parseInt(x)}/${parseInt(y)}`
+      //   );
+
+        // const hipotenusa = Math.sqrt(Math.pow(centerDist,2) + Math.pow(anguloFaltante,2))
+      // });
+    } catch (e) {
+      console.log(e);
+    }
+  });
   try {
     Object.keys(data).forEach(async (degree) => {
       msrValues["lastValues"][degree] = msrValues["lastValues"][degree] || [];
@@ -914,8 +944,10 @@ const xyzGenerate = async () => {
       Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
         Object.keys(msrValues["degreeMov"][degreeMag]["soft"]).forEach(
           async (degreeLidar) => {
-            const degreeAccelRot = msrValues["degreeMov"][degreeMag]["degreeAccelX"]
-            const degreeCalcAcc = parseInt(degreeLidar) + parseInt(degreeAccelRot);
+            const degreeAccelRot =
+              msrValues["degreeMov"][degreeMag]["degreeAccelX"];
+            const degreeCalcAcc =
+              parseInt(degreeLidar) + parseInt(degreeAccelRot);
             if (degreeCalcAcc % 1 === 0) {
               resolve(
                 await dataServices
@@ -956,17 +988,99 @@ function compile() {
 }
 
 // Função para calcular o comprimento do terceiro lado do triângulo retângulo
-function calcularLadoFaltante(hipotenusa, ladoConhecido) {
-  // Aplicando o teorema de Pitágoras: a^2 + b^2 = c^2
-  // Onde 'a' e 'b' são os lados conhecidos e 'c' é a hipotenusa
-
-  const ladoFaltante = Math.sqrt(Math.pow(hipotenusa, 2) - Math.pow(ladoConhecido, 2));
+async function calcularLadoFaltante(hipotenusa, ladoConhecido) {
+  const ladoFaltante = Math.sqrt(
+    Math.pow(hipotenusa, 2) - Math.pow(ladoConhecido, 2)
+  );
   return ladoFaltante;
 }
 
-// Exemplo de uso da função
-const hipotenusa = 5; // Valor da hipotenusa
-const ladoConhecido = 3; // Valor de um dos lados
+// // Função para calcular o ângulo a partir das medidas do cateto adjacente e do cateto oposto
+// function calcularAngulo(adjacente, oposto) {
+//   // Usando a função atan2 para calcular o ângulo em radianos
+//   const anguloRad = Math.atan2(oposto, adjacente);
 
-const ladoFaltante = calcularLadoFaltante(hipotenusa, ladoConhecido);
-console.log("O comprimento do terceiro lado é:", ladoFaltante);
+//   // Convertendo o ângulo de radianos para graus
+//   const anguloGraus = (anguloRad * 180) / Math.PI;
+
+//   // Garantindo que o ângulo retornado esteja entre 0 e 360 graus
+//   const anguloFinal = anguloGraus >= 0 ? anguloGraus : 360 + anguloGraus;
+
+//   return anguloFinal;
+// }
+
+
+// // Função para calcular as coordenadas (x, y) de um ponto dentro de uma circunferência
+// function calcularCoordenadasCircunferencia(diametro, a, b, angulo) {
+//   // Calculando o raio da circunferência (que é metade do diâmetro)
+//   const raio = diametro / 2;
+  
+//   // Calculando a metade da corda AB
+//   const metadeAB = (a + b) / 2;
+
+//   // Calculando a distância do ponto P até o centro da circunferência
+//   const distanciaPCentro = Math.sqrt((raio ** 2) - (metadeAB ** 2));
+
+//   // Convertendo o ângulo para radianos
+//   const anguloRadianos = angulo * Math.PI / 180;
+
+//   // Calculando as coordenadas x e y do ponto P
+//   const x = distanciaPCentro * Math.cos(anguloRadianos);
+//   const y = distanciaPCentro * Math.sin(anguloRadianos);
+
+//   return { x, y };
+// }
+
+// // Exemplo de uso da função
+// const diametro = 10; // Diâmetro total da circunferência
+// const a = 3; // Medida do trecho A da corda AB em relação ao ponto desejado
+// const b = 3; // Medida do trecho B da corda AB em relação ao ponto desejado
+// const angulo = 30; // Ângulo em relação à corda AB e a tangente
+
+// const coordenadas = calcularCoordenadasCircunferencia(diametro, a, b, angulo);
+// console.log("As coordenadas do ponto dentro da circunferência são:", coordenadas);
+const AB = 306.2
+const raio = 175
+const u = 21.85 //angulo micro -> celular norte
+const alfa = 90-u // angulo alm ,fa
+const radAlfa = (alfa * Math.PI) / 180.0;
+const wS = 40 // Valor estipulado
+
+
+      calcularLadoFaltante(raio, AB / 2).then((wc) => {
+        console.log('wC: ',wc)
+        const x1 = wc * Math.cos(radAlfa);
+        const y1 = wc * Math.sin(radAlfa);
+        console.log(`Valores de xy1: x1:${x1} / y1:${y1}`)        
+        const radU = (u * Math.PI) / 180.0;
+        const x2 = wS * Math.cos(radU);
+        const y2 = wS * Math.sin(radU);
+        console.log(`Valores de xy2: x2:${x2} / y2:${y2}`)  
+        const xT = x1 + x2
+        const yT = y2-y1
+
+        console.log(`Valores de xy: x:${xT} / y:${yT}`)
+
+        
+
+
+
+
+
+
+
+
+
+
+
+        // const centerDist = msrValues["last360"][degreeCalc] / 2 - wc; //w
+        // const oppositeDegree = 90 - rotation360;
+        // const x = x1 + x2
+        // const y = y2 - y1
+
+        // console.log(
+        //   `Angulo ${degreeCalc}: ${distAtual} - distancia do centro: ${parseInt(wc)} - x/y: ${parseInt(x)}/${parseInt(y)}`
+        // );
+
+        // const hipotenusa = Math.sqrt(Math.pow(centerDist,2) + Math.pow(wc,2))
+      });
