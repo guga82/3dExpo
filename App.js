@@ -170,18 +170,6 @@ export default function App() {
         rotation360 = degrees;
       }
 
-      // console.log(
-      //   "giro: ",
-      //   degrees,
-      //   " - rot360: ",
-      //   rotation360,
-      //   " - x: ",
-      //   magnetRot.x,
-      //   " - y: ",
-      //   magnetRot.y,
-      //   " - z: ",
-      //   magnetRot.z
-      // );
     } else if (Math.abs(accelerometerAvg.y) > 90) {
       // Ponta para cima
       let rad = Math.atan(magnetometerAvg.z / magnetometerAvg.x);
@@ -200,18 +188,6 @@ export default function App() {
         rotation360 = degrees;
       }
 
-      // console.log(
-      //   "giro: ",
-      //   degrees,
-      //   " - rot360: ",
-      //   rotation360,
-      //   " - x: ",
-      //   magnetRot.x,
-      //   " - y: ",
-      //   magnetRot.y,
-      //   " - z: ",
-      //   magnetRot.z
-      // );
     } else if (Math.abs(accelerometerAvg.z) > 90) {
       // Tela para cima
 
@@ -302,38 +278,7 @@ export default function App() {
     return (degreeAccelX = parseInt(degreeCalc * -1));
   }
 
-  // Barometer.setUpdateInterval(50);
-  // Barometer.addListener(async (res) => {
-  //   // setPressure(res.pressure);
-  //   // barometerValues.push(parseInt(res.pressure*10000))
-
-  //   barometerValues = await dataServices.poolingData(
-  //     barometerValues,
-  //     parseInt(res.pressure * 1000),
-  //     barometerSizeAverage
-  //   );
-  //   return barometerUpdate();
-  // });
-
-  // function barometerUpdate() {
-  //   dataServices
-  //     .averageCalcSemOutliers(
-  //       barometerValues,
-  //       0.9,
-  //       dataServices.averageCalc,
-  //       dataServices.calcStdDeviation
-  //     )
-  //     .then((res) => {
-  //       // console.log(parseInt(res));
-  //     });
-  // }
-
-  // setInterval(barometerUpdate, 200);
-
-  // const ws = new WebSocket("wss://echo.websocket.org");
   const ws = new WebSocket("ws://192.168.3.10:81");
-  // const ws = new WebSocket("ws://192.168.43.12:81");
-  // console.log("Iniciado WebSocket");
 
   ws.onopen = (event) => {
     console.log("Sensor conectado!");
@@ -730,20 +675,9 @@ async function pointsFilter(degreePF, distance) {
     writingSoft().then(async () => {
       msrValues["soft"] = softTemp;
       bufferSize(softTemp).then(()=>{
-
-        // if (degreeAccelX !== lastDegreeAcc || lastDegreeMag !== rotation360) {
-        //   msrValues["last360"] = {};
-        //   msrValues["cnt360update"] = {};
-        // }
-        // lastDegreeAcc = degreeAccelX;
-        // lastDegreeMag = rotation360;
-
       });
 
 
-      //console.log("Confiabilidade: ", Object.values(msrValues["reliability"]).sort((a,b)=>b-a))
-      // console.log(await mediaTest())
-      // console.log(msrValues.highFilter)
       async function mediaTest() {
         return await dataServices.averageCalcSemOutliers(
           Object.values(msrValues["reliability"]),
@@ -976,30 +910,6 @@ const xyzGenerate = async () => {
         });
       });
     } else if (msrValues["degreeMov"]) {
-      // console.log(msrValues.degreeMov);
-      // Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag, indexMag) => {
-      //   Object.keys(msrValues["degreeMov"][degreeMag]["last360"]).forEach(
-      //     async (degreeLidar) => {
-      //       resolve(
-      //         await dataServices
-      //           .lidarToXYZ(
-      //             degreeLidar,
-      //             msrValues["degreeMov"][degreeMag]["last360"][degreeLidar],
-      //             0
-      //           )
-      //           .then(async (res) => {
-      //             return msrValues["xyz"].push({
-      //               x: res.x,
-      //               y: res.y,
-      //               z: indexMag * 800,
-      //             });
-      //           })
-      //           .catch((err) => console.log(err))
-      //       );
-      //     }
-      //   );
-      // });
-
       console.log(msrValues.degreeMov);
       Object.keys(msrValues["degreeMov"]).forEach(async (degreeMag) => {
         Object.keys(msrValues["degreeMov"][degreeMag]["soft"]).forEach(
@@ -1044,3 +954,19 @@ function compile() {
     );
   });
 }
+
+// Função para calcular o comprimento do terceiro lado do triângulo retângulo
+function calcularLadoFaltante(hipotenusa, ladoConhecido) {
+  // Aplicando o teorema de Pitágoras: a^2 + b^2 = c^2
+  // Onde 'a' e 'b' são os lados conhecidos e 'c' é a hipotenusa
+
+  const ladoFaltante = Math.sqrt(Math.pow(hipotenusa, 2) - Math.pow(ladoConhecido, 2));
+  return ladoFaltante;
+}
+
+// Exemplo de uso da função
+const hipotenusa = 5; // Valor da hipotenusa
+const ladoConhecido = 3; // Valor de um dos lados
+
+const ladoFaltante = calcularLadoFaltante(hipotenusa, ladoConhecido);
+console.log("O comprimento do terceiro lado é:", ladoFaltante);

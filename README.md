@@ -45,3 +45,9 @@ Usar:
 
 
 - Corrigir giro do sensor pelo eixo Y (tela pra cima) ou X (tela para frente)
+
+
+## Próximos passos
+- Calcular o perímetro total
+- Extrair o diâmetro/raio do silo
+
